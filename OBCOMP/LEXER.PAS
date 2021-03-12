@@ -7,7 +7,7 @@ type
   	{ Keywords }
 		ArrayToken,		BeginToken,	CaseToken,	ConstToken,		DivToken,	DoToken,
 		ElseToken,		ElsifToken,	EndToken,		ImportToken,	IfToken,
-		IsToken,			InToken,		ModToken,		ModuleToken,	OfToken,
+		IsToken,			InToken,		ModToken,		ModuleToken,	OfToken,  ProcedureToken,
 		PointerToken, RecordToken,RepeatToken,TypeToken,		VarToken,		WithToken,		WhileToken,
 
     { 2 character tokens }
@@ -17,12 +17,13 @@ type
     PlusToken,					ColonToken,			CommaToken,		GreaterThanToken,
     LeftBracketToken, 	LessThanToken,  DashToken, 		MultiplyToken,
 		RightBracketToken,	SemicolonToken,	DotToken,			MinusToken,
+    EqualsToken,
 
     { others }
     IdentifierToken, StringLiteralToken, IntegerToken, RealToken,
 
     { internal }
-		NoneToken, EOFToken
+		NoneToken, EOFToken, BadToken
 	);
 
   Location = record
@@ -44,34 +45,34 @@ type
 
 
 const
-	KEYWORDS : packed array[KeywordToken] of string[7] = (
+	KEYWORDS : packed array[KeywordToken] of string[9] = (
   'ARRAY', 'BEGIN', 'CASE', 'CONST', 'DIV', 'DO', 'ELSE', 'ELSIF',
 	'END', 'IMPORT', 'IF', 'IS', 'IN', 'MOD', 'MODULE', 'OF',
-	'POINTER', 'RECORD', 'REPEAT', 'TYPE', 'VAR', 'WITH', 'WHILE');
+	'POINTER', 'PROCEDURE', 'RECORD', 'REPEAT', 'TYPE', 'VAR', 'WITH', 'WHILE');
 
   EOF_CHAR = char(26);
 
 
   function hasNext: Boolean;
-  procedure nextToken(var t: Token);
+  function nextToken: TTokenType;
 
 
-
+var
+  currentLocation: Location;
 
 implementation
 
 var
-	currentLocation: Location;
 	currentPeekChar: char;
   hasNextFlag: Boolean;
-
+  t: Token;
 
 function nextChar: char;
 begin
   if currentPeekChar = Char(10) then
   	begin
   		Inc(currentLocation.line);
-  		currentLocation.from := 0;
+  		currentLocation.from := 1;
 		end
 	else
   	Inc(currentLocation.from);
@@ -98,11 +99,11 @@ begin;
 end;
 
 
-procedure resolveSymbol(var t: Token);
+function resolveSymbol: TTokenType;
+var tokenType: TTokenType;
 begin
   t.location := currentLocation;
 
-  with t do
   case nextChar of
   { Potentially two character tokens }
 	'>': tokenType := select('=', GreaterThanEqualToken, GreaterThanToken);
@@ -119,32 +120,34 @@ begin
   ';': tokenType := SemicolonToken;
   '.': tokenType := DotToken;
   '-': tokenType := DashToken;
+  '=': tokenType := EqualsToken;
   end;
 
   t.location.last := currentLocation.from;
+  resolveSymbol := tokenType;
 end;
 
 
-procedure processKeyword(var t: Token);
+function processKeyword: TTokenType;
 var
 	i : TTokenType;
 begin
   for i:= Low(KeywordToken) to High(KeywordToken) do
   	if KEYWORDS[i] = t.identifierString then
     begin
-    	t.tokenType := i;
+    	processKeyword := i;
       exit;
     end;
+  processKeyword := IdentifierToken;
 end;
 
 
 
-procedure processIdentifier(var t: Token);
+function processIdentifier: TTokenType;
 var
 	possibleKeyword: boolean;
 begin
 	possibleKeyword := True;
-	t.tokenType := IdentifierToken;
   t.identifierString := '';
 
   while peekChar in ['a'..'z', 'A'..'Z', '0'..'9'] do
@@ -153,12 +156,15 @@ begin
 		t.identifierString := t.identifierString + nextChar;
   end;
 
-  if possibleKeyword then processKeyword(t);
+  if possibleKeyword then
+    processIdentifier := processKeyword
+  else
+    processIdentifier := IdentifierToken;
 end;
 
 
 
-procedure processNumber(var t: Token);
+procedure processNumber;
 const
 	BASE = 10; { TODO: change when we process hex digits }
 var
@@ -180,7 +186,7 @@ begin
 end;
 
 
-procedure processStringLiteral(var t: Token);
+procedure processStringLiteral;
 begin
 	t.literalString := '';
   t.tokenType := StringLiteralToken;
@@ -194,7 +200,7 @@ end;
 
 
 
-procedure handleEOF(var t: Token);
+procedure handleEOF;
 begin
 	nextChar;
   t.tokenType := EOFToken;
@@ -203,18 +209,18 @@ end;
 
 
 
-procedure nextToken(var t: Token);
+function nextToken: TTokenType;
 begin
   skipWhiteSpace;
   t.location := currentLocation;
   t.tokenType := NoneToken;
 
   case peekChar of
-  	'a'..'z', 'A'..'Z': processIdentifier(t);
-    '0'..'9': 					processNumber(t);
-    '"':								processStringLiteral(t);
-    EOF_CHAR:						handleEOF(t);
-    else								resolveSymbol(t);
+  	'a'..'z', 'A'..'Z': nextToken := processIdentifier;
+    '0'..'9': 					processNumber;
+    '"':								processStringLiteral;
+    EOF_CHAR:						handleEOF;
+    else								nextToken := resolveSymbol;
   end;
 
   t.location.last := currentLocation.from -1;
@@ -225,6 +231,8 @@ begin
   		writeln('LEX failure at ', line, ':', from);
      	halt(1);
     end;
+
+  nextToken := t.tokenType;
 end;
 
 
@@ -238,5 +246,7 @@ begin
 	{ prime the pump.. }
   hasNextFlag := True;
   nextChar;
-  currentLocation.from := 0;
+  currentLocation.line := 1;
+  currentLocation.from := 1;
+  currentLocation.last := 1;
 end.
