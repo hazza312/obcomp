@@ -3,40 +3,49 @@ unit Lexer;
 interface
 
 type
-	TTokenType = (
-  	{ Keywords }
-		ArrayToken,		BeginToken,	CaseToken,	ConstToken,		DivToken,	DoToken,
-		ElseToken,		ElsifToken,	EndToken,		ImportToken,	IfToken,
-		IsToken,			InToken,		ModToken,		ModuleToken,	OfToken,
-		PointerToken, RecordToken,RepeatToken,TypeToken,		VarToken,		WithToken,		WhileToken,
+  TTokenType = (
+    { Keywords }
+    ArrayToken,     BeginToken,   ByToken,     CaseToken,   ConstToken,   DivToken,
+    DoToken,        ElseToken,    ElsifToken,  EndToken,    FalseToken,
+    ForToken,     ImportToken,
+    IfToken,        IsToken,      InToken,   ModToken,    ModuleToken,   NilToken,
+    OfToken,
+    ProcedureToken, PointerToken, RecordToken, RepeatToken, ReturnToken,  ThenToken,
+    ToToken,        TrueToken, TypeToken,    UntilToken,  VarToken,    WithToken,    WhileToken,
 
-    { 2 character tokens }
-    AssignToken,	BetweenToken,	LessThanEqualToken,	GreaterThanEqualToken,
+    { relational operators }
+    EqualsToken, HashToken, LTToken, LTEToken, GTToken, GTEToken, {InToken, IsToken,}
 
-    { 1 character tokens }
-    PlusToken,					ColonToken,			CommaToken,		GreaterThanToken,
-    LeftBracketToken, 	LessThanToken,  DashToken, 		MultiplyToken,
-		RightBracketToken,	SemicolonToken,	DotToken,			MinusToken,
+    { binary operators }
+    AndToken, PlusToken, DashToken, OrToken, StarToken {also ptr}, SlashToken,
 
-    { others }
+    { selectors }
+    LeftSquareToken, RightSquareToken, CaretToken, DotToken,
+
+    { other syntactic elements }
+    ColonToken, CommaToken, LeftBracketToken, RightBracketToken,
+    SemicolonToken, PipeToken, AssignToken,  BetweenToken,
+    LeftCurlyToken, RightCurlyToken, TildeToken,
+
+    { lex result converted type }
     IdentifierToken, StringLiteralToken, IntegerToken, RealToken,
 
     { internal }
-		NoneToken, EOFToken
-	);
+    NoneToken, EOFToken, BadToken
+  );
 
   Location = record
-  	line: integer;
+    line: integer;
     from: integer;
     last: integer;
   end;
 
   Token = record
-  	location: Location;
-  	case tokenType: TTokenType of
-    	IdentifierToken: 		(identifierString: string); {todo: str pointer?}
-      IntegerToken: 			(integerValue: integer);
-      RealToken:					(realValue: real);
+    location: Location;
+    case tokenType: TTokenType of
+      IdentifierToken:     (identifierString: string); {todo: str pointer?}
+      IntegerToken:       (integerValue: integer);
+      RealToken:          (realValue: real);
       StringLiteralToken: (literalString: string);
   end;
 
@@ -44,199 +53,204 @@ type
 
 
 const
-	KEYWORDS : packed array[KeywordToken] of string[7] = (
-  'ARRAY', 'BEGIN', 'CASE', 'CONST', 'DIV', 'DO', 'ELSE', 'ELSIF',
-	'END', 'IMPORT', 'IF', 'IS', 'IN', 'MOD', 'MODULE', 'OF',
-	'POINTER', 'RECORD', 'REPEAT', 'TYPE', 'VAR', 'WITH', 'WHILE');
+  KEYWORDS : packed array[KeywordToken] of string[9] = (
+  'ARRAY', 'BEGIN', 'BY', 'CASE', 'CONST', 'DIV', 'DO', 'ELSE', 'ELSIF',
+  'END', 'FALSE', 'FOR', 'IMPORT', 'IF', 'IS', 'IN', 'MOD', 'MODULE', 'NIL', 'OF',
+  'POINTER', 'PROCEDURE', 'RECORD', 'REPEAT', 'RETURN', 'THEN', 'TO',
+  'TRUE', 'TYPE', 'UNTIL', 'VAR', 'WITH', 'WHILE');
 
   EOF_CHAR = char(26);
 
 
   function hasNext: Boolean;
-  procedure nextToken(var t: Token);
+  function nextToken: TTokenType;
 
 
-
+var
+  currentLocation: Location;
 
 implementation
 
 var
-	currentLocation: Location;
-	currentPeekChar: char;
+  currentPeekChar: char;
   hasNextFlag: Boolean;
-
+  t: Token;
 
 function nextChar: char;
 begin
   if currentPeekChar = Char(10) then
-  	begin
-  		Inc(currentLocation.line);
-  		currentLocation.from := 0;
-		end
-	else
-  	Inc(currentLocation.from);
+    begin
+      Inc(currentLocation.line);
+      currentLocation.from := 1;
+    end
+  else
+    Inc(currentLocation.from);
 
- 	nextChar := currentPeekChar;
+   nextChar := currentPeekChar;
   read(currentPeekChar);
 end;
 
 function peekChar: char;
 begin
-	peekChar := currentPeekChar;
+  peekChar := currentPeekChar;
 end;
 
 
-function select(c1: char; tt1, tt2: TTokenType): TTokenType;
-begin;
-	if c1 = peekChar then
-  	begin
-			select := tt1;
-			nextChar; {consume the second char that was peeked}
-		end
-	else
-		select := tt2;
-end;
 
 
-procedure resolveSymbol(var t: Token);
+function resolveSymbol: TTokenType;
+
+  procedure select(c1: char; tt1, tt2: TTokenType);
+  begin;
+    if c1 = peekChar then
+      begin
+        resolveSymbol := tt1;
+        nextChar; {consume the second char that was peeked}
+      end
+    else
+      resolveSymbol := tt2;
+  end;
+
+
 begin
   t.location := currentLocation;
 
-  with t do
   case nextChar of
   { Potentially two character tokens }
-	'>': tokenType := select('=', GreaterThanEqualToken, GreaterThanToken);
-	'<': tokenType := select('=', LessThanEqualToken,		 LessThanToken);
-  '.': tokenType := select('.', BetweenToken, 				 DotToken);
-  ':': tokenType := select('=', AssignToken,					 ColonToken);
+  '>': select('=', GTEToken,     GTToken);
+  '<': select('=', LTEToken,     LTToken);
+  '.': select('.', BetweenToken, DotToken);
+  ':': select('=', AssignToken,  ColonToken);
 
-	'+': tokenType := PlusToken;
-  ':': tokenType := ColonToken;
-  ',': tokenType := CommaToken;
-  '(': tokenType := LeftBracketToken;
-  '*': tokenType := MultiplyToken;
-  ')': tokenType := RightBracketToken;
-  ';': tokenType := SemicolonToken;
-  '.': tokenType := DotToken;
-  '-': tokenType := DashToken;
+  '+': resolvesymbol := PlusToken;
+  ',': resolveSymbol := CommaToken;
+  '(': resolveSymbol := LeftBracketToken;
+  '*': resolveSymbol := StarToken;
+  ')': resolveSymbol := RightBracketToken;
+  ';': resolveSymbol := SemicolonToken;
+  '-': resolveSymbol := DashToken;
+  '=': resolveSymbol := EqualsToken;
+  '|': resolveSymbol := PipeToken;
   end;
 
   t.location.last := currentLocation.from;
 end;
 
 
-procedure processKeyword(var t: Token);
+function processKeyword: TTokenType;
 var
-	i : TTokenType;
+  i : TTokenType;
 begin
   for i:= Low(KeywordToken) to High(KeywordToken) do
-  	if KEYWORDS[i] = t.identifierString then
+    if KEYWORDS[i] = t.identifierString then
     begin
-    	t.tokenType := i;
+      processKeyword := i;
       exit;
     end;
+  processKeyword := IdentifierToken;
 end;
 
 
 
-procedure processIdentifier(var t: Token);
+function processIdentifier: TTokenType;
 var
-	possibleKeyword: boolean;
+  possibleKeyword: boolean;
 begin
-	possibleKeyword := True;
-	t.tokenType := IdentifierToken;
+  possibleKeyword := True;
   t.identifierString := '';
 
   while peekChar in ['a'..'z', 'A'..'Z', '0'..'9'] do
   begin
-  	if peekChar in ['a'..'z'] then possibleKeyword := False;
-		t.identifierString := t.identifierString + nextChar;
+    if peekChar in ['a'..'z'] then possibleKeyword := False;
+    t.identifierString := t.identifierString + nextChar;
   end;
 
-  if possibleKeyword then processKeyword(t);
+  if possibleKeyword then
+    processIdentifier := processKeyword
+  else
+    processIdentifier := IdentifierToken;
 end;
 
 
 
-procedure processNumber(var t: Token);
+function processNumber: TTokenType;
 const
-	BASE = 10; { TODO: change when we process hex digits }
+  BASE = 10; { TODO: change when we process hex digits }
 var
   n: integer;
 begin
   n := 0;
-  t.tokenType := IntegerToken;
-
-	while peekChar in ['0'..'9'] do
-  	n := (n * BASE) + (ord(nextChar) - ord('0'));
+  while peekChar in ['0'..'9'] do
+    n := (n * BASE) + (ord(nextChar) - ord('0'));
 
   t.integerValue := n;
+  processNumber := IntegerToken;
 end;
 
 
 procedure skipWhiteSpace;
 begin
-	while peekChar in [' ', char(13), char(10)] do nextChar;
+  while peekChar in [' ', char(13), char(10)] do nextChar;
 end;
 
 
-procedure processStringLiteral(var t: Token);
+function processStringLiteral: TTokenType;
 begin
-	t.literalString := '';
-  t.tokenType := StringLiteralToken;
-
-	nextChar; { consume opening " }
+  t.literalString := '';
+  nextChar; { consume opening " }
   while peekChar <> '"' do
-  	t.literalString := t.literalString + nextChar;
+    t.literalString := t.literalString + nextChar;
 
   nextChar; { consume closing " }
+  processStringLiteral := StringLiteralToken;
 end;
 
 
 
-procedure handleEOF(var t: Token);
+function handleEOF: TTokenType;
 begin
-	nextChar;
-  t.tokenType := EOFToken;
+  nextChar;
   hasNextFlag := False;
+  handleEOF := EOFToken;
 end;
 
 
 
-procedure nextToken(var t: Token);
+function nextToken: TTokenType;
 begin
   skipWhiteSpace;
   t.location := currentLocation;
-  t.tokenType := NoneToken;
 
   case peekChar of
-  	'a'..'z', 'A'..'Z': processIdentifier(t);
-    '0'..'9': 					processNumber(t);
-    '"':								processStringLiteral(t);
-    EOF_CHAR:						handleEOF(t);
-    else								resolveSymbol(t);
+    'a'..'z', 'A'..'Z': nextToken := processIdentifier;
+    '0'..'9':           nextToken := processNumber;
+    '"':                nextToken := processStringLiteral;
+    EOF_CHAR:           nextToken := handleEOF;
+    else                nextToken := resolveSymbol;
   end;
 
   t.location.last := currentLocation.from -1;
 
-  if (t.tokenType = NoneToken) then
-  	with currentLocation do
+  if (nextToken = NoneToken) then
+    with currentLocation do
     begin
-  		writeln('LEX failure at ', line, ':', from);
-     	halt(1);
+      writeln('LEX failure at ', line, ':', from);
+      halt(1);
     end;
 end;
 
 
 function hasNext: Boolean;
 begin
- 	hasNext := hasNextFlag;
+   hasNext := hasNextFlag;
 end;
 
 
 begin
-	{ prime the pump.. }
+  { prime the pump.. }
   hasNextFlag := True;
   nextChar;
-  currentLocation.from := 0;
+  currentLocation.line := 1;
+  currentLocation.from := 1;
+  currentLocation.last := 1;
 end.
