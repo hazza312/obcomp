@@ -4,3 +4,12 @@
 *.BAK
 *.MAP
 TP7/
+*.err
+*.out
+*.bak
+*.o
+*.ppu
+*.cfg
+*.dsk
+*.ini
+
