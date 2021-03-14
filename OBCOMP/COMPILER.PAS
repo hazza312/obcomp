@@ -17,7 +17,8 @@ end;
 procedure Error(msg: string);
 begin
   with currentLocation do
-  writeln(line, ':', from, '-', last, ' - Parse error ' + msg);
+  write(line, ':', from, '-', last, ' - Parse error ' + msg);
+  writeln(' => got ', peekToken);
   halt(1);
 end;
 
@@ -55,6 +56,13 @@ begin
   { expect(IdentifierToken, 'Identifier Expected'); }
 end;
 
+
+procedure parseIdentifierDef;
+begin
+  accept(StarToken);
+end;
+
+
 procedure parseQualident;
 begin
   repeat
@@ -66,8 +74,12 @@ end;
 procedure parseIdentList;
 begin
   expect(IdentifierToken, 'Identifier expected');
+  parseIdentifierDef;
   while accept(CommaToken) do
-    expect(IdentifierToken, 'Identifier expected following comma in identlist');
+    begin
+      expect(IdentifierToken, 'Identifier expected following comma in identlist');
+      parseIdentifierDef;
+    end;
 end;
 
 procedure parseFormalType;
@@ -93,18 +105,21 @@ end;
 
 procedure parseFormalParameters;
 begin
-  { left brack accepted }
-  if not accept(RightBracketToken) then
-    begin
-      repeat
-        parseFPSection;
-      until not accept(SemiColonToken);
 
-      expect(RightBracketToken, ') expected');
-  end;
+  if accept(LeftBracketToken) then
+    begin
+      if not accept(RightBracketToken) then
+        begin
+          parseFPSection;
+          while accept(SemiColonToken) do
+            parseFPSection;
+    
+          expect(RightBracketToken, ') expected');
+        end
+      end;
 
   if accept(ColonToken) then
-    parseQualident
+    parseQualident;
 end;
 
 procedure ParseImport;
@@ -153,10 +168,7 @@ begin
   else if accept(FalseToken) then
   else if accept(IntegerToken) then
   else if accept(StringLiteralToken) then
-    begin
-      parseIdentifier;  { hack for now }
-      expect(StringLiteralToken, 'closing " required');
-    end
+    
   else if accept(LeftCurlyToken) then
       parseSet
   else if accept(LeftBracketToken) then
@@ -183,7 +195,10 @@ const
 begin
   parseFactor;
   while peekToken in mulop do
-    parseFactor
+    begin
+      Next;
+      parseFactor      
+    end;
 end;
 
 procedure parseConstExpression;
@@ -196,14 +211,16 @@ const
   plusOps = [PlusToken, DashToken, OrToken];
 var
   negate: boolean;
-  n: integer;
 begin
   { }
   negate := accept(DashToken); accept(PlusToken);
   parseTerm;
   while peekToken in plusOps do
+    begin
+    Next;
     { do something specific with the token }
     parseTerm;
+    end;
 end;
 
 procedure parseExpression;
@@ -211,7 +228,11 @@ const
   relop = [EqualsToken, HashToken, LTToken, LTEToken, GTToken, GTEToken, InToken, IsToken];
 begin
   parseSimpleExpression;
-  if peekToken in relop then parseSimpleExpression;
+  if peekToken in relop then 
+  begin 
+    Next;
+    parseSimpleExpression;
+  end;
 end;
 
 { Declarations ************************************************************** }
@@ -325,10 +346,12 @@ procedure parseStatementSequence; forward;
 
 procedure parseProcedureHeading;
 begin
-  expect(ProcedureToken, 'PROCEDURE expected');
+  { expect(ProcedureToken, 'PROCEDURE expected'); accepted }
   expect(IdentifierToken, 'Identifier expected');
-  if accept(LeftBracketToken) then
-    parseFormalParameters;
+  parseIdentifierDef;
+  if peekToken in [ColonToken, LeftBracketToken] then
+    parseFormalParameters
+
 end;
 
 
@@ -515,10 +538,10 @@ end;
 
 procedure parseStatementSequence;
 begin
-  repeat
-    parseStatement;
-    { do something with the statement }
-  until not accept(SemicolonToken);
+  parseStatement;
+  while accept(SemicolonToken) do 
+    parseStatement;  
+
 end;
 
 { some forward references }
@@ -534,6 +557,7 @@ begin
     parseExpression;
 
   expect(EndToken, 'END expected');
+  expect(IdentifierToken, 'expect identifier after END of procedure');
 end;
 
 procedure parseProcedureDeclaration;
@@ -546,10 +570,10 @@ end;
 
 procedure ParseDeclarationSequence;
 const
-  moveOn = [ConstToken, TypeToken, VarToken, BeginToken];
+  moveOn = [ConstToken, TypeToken, VarToken, BeginToken, ProcedureToken];
 
 begin
-  while peekToken in [ConstToken, TypeToken, VarToken] do
+  while peekToken in [ConstToken, TypeToken, VarToken, ProcedureToken] do
     begin
       if accept(ConstToken) then
         repeat parseConstDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
@@ -559,6 +583,9 @@ begin
 
       else if accept(VarToken) then
       repeat parseVarDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
+
+      else if accept(ProcedureToken) then
+      repeat parseProcedureDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
     end;
 end;
 
