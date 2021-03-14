@@ -9,8 +9,8 @@ type
     DoToken,        ElseToken,    ElsifToken,  EndToken,    FalseToken,
     ForToken,     ImportToken,
     IfToken,        IsToken,      InToken,   ModToken,    ModuleToken,   NilToken,
-    OfToken,
-    ProcedureToken, PointerToken, RecordToken, RepeatToken, ReturnToken,  ThenToken,
+    OfToken,     PointerToken, ProcedureToken,
+    RecordToken, RepeatToken, ReturnToken,  ThenToken,
     ToToken,        TrueToken, TypeToken,    UntilToken,  VarToken,    WithToken,    WhileToken,
 
     { relational operators }
