@@ -81,12 +81,12 @@ begin
   if currentPeekChar = Char(10) then
     begin
       Inc(currentLocation.line);
-      currentLocation.from := 1;
+      currentLocation.last := 1;
     end
   else
-    Inc(currentLocation.from);
+    Inc(currentLocation.last);
 
-   nextChar := currentPeekChar;
+  nextChar := currentPeekChar;
   read(currentPeekChar);
 end;
 
@@ -113,8 +113,6 @@ function resolveSymbol: TTokenType;
 
 
 begin
-  t.location := currentLocation;
-
   case nextChar of
   { Potentially two character tokens }
   '>': select('=', GTEToken,     GTToken);
@@ -132,8 +130,6 @@ begin
   '=': resolveSymbol := EqualsToken;
   '|': resolveSymbol := PipeToken;
   end;
-
-  t.location.last := currentLocation.from;
 end;
 
 
@@ -219,7 +215,7 @@ end;
 function nextToken: TTokenType;
 begin
   skipWhiteSpace;
-  t.location := currentLocation;
+  t.location.from := currentLocation.last;
 
   case peekChar of
     'a'..'z', 'A'..'Z': nextToken := processIdentifier;
@@ -229,7 +225,7 @@ begin
     else                nextToken := resolveSymbol;
   end;
 
-  t.location.last := currentLocation.from -1;
+  t.location.last := currentLocation.last -1;
 
   if (nextToken = NoneToken) then
     with currentLocation do

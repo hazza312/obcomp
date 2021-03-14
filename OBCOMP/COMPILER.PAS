@@ -2,27 +2,36 @@ program Compiler;
 
 uses Lexer, Debug;
 
+var
+  peekToken: TTokenType;
+
+
 { Internal Parser Functions ************************************************* }
 
-procedure error(msg: string);
+function Next: TTokenType;
+begin
+  Next := peekToken;
+  peekToken := Lexer.nextToken;
+end;
+
+procedure Error(msg: string);
 begin
   with currentLocation do
   writeln(line, ':', from, '-', last, ' - Parse error ' + msg);
   halt(1);
 end;
 
-procedure expect(tokenType: TTokenType; msg: string);
-var
-  tt: TTokenType;
+procedure Expect(tokenType: TTokenType; msg: string);
 begin
-  tt := nextToken;
-  if tt <> tokenType then begin error(msg) end;
+  if peekToken <> tokenType then
+    error(msg)
+  else Next;
 end;
 
-function accept(tokenType: TTokenType): boolean;
+function Accept(tokenType: TTokenType): boolean;
 begin
-  accept := nextToken = tokenType;
-  { TODO don't consume the token if unaccepted }
+  Accept := peekToken = tokenType;
+  if Accept then Next;
 end;
 
 
@@ -572,5 +581,6 @@ end;
 var
   i: integer;
 begin
+  Next; { prime pump }
   ParseModule;
 end.
