@@ -68,19 +68,24 @@ const
 
 var
   currentLocation: Location;
+  identifier: string;
+  integerLiteral: integer;
+  realLiteral: real;
+  stringLiteral: string;
 
 implementation
 
 var
   currentPeekChar: char;
   hasNextFlag: Boolean;
-  t: Token;
+
 
 function nextChar: char;
 begin
   if currentPeekChar = Char(10) then
     begin
       Inc(currentLocation.line);
+      currentLocation.from := 1;
       currentLocation.last := 1;
     end
   else
@@ -129,6 +134,15 @@ begin
   '-': resolveSymbol := DashToken;
   '=': resolveSymbol := EqualsToken;
   '|': resolveSymbol := PipeToken;
+  '[': resolveSymbol := LeftSquareToken;
+  ']': resolveSymbol := RightSquareToken;
+  '#': resolveSymbol := HashToken;
+  '^': resolveSymbol := CaretToken;
+  '{': resolveSymbol := LeftCurlyToken;
+  '}': resolveSymbol := RightCurlyToken;
+  '&': resolveSymbol := AndToken;
+  '/': resolveSymbol := SlashToken;
+  '~': resolveSymbol := TildeToken;
   end;
 end;
 
@@ -138,7 +152,7 @@ var
   i : TTokenType;
 begin
   for i:= Low(KeywordToken) to High(KeywordToken) do
-    if KEYWORDS[i] = t.identifierString then
+    if KEYWORDS[i] = identifier then
     begin
       processKeyword := i;
       exit;
@@ -153,12 +167,13 @@ var
   possibleKeyword: boolean;
 begin
   possibleKeyword := True;
-  t.identifierString := '';
+  identifier := '';
 
   while peekChar in ['a'..'z', 'A'..'Z', '0'..'9'] do
   begin
     if peekChar in ['a'..'z'] then possibleKeyword := False;
-    t.identifierString := t.identifierString + nextChar;
+    identifier := identifier + nextChar;
+    Inc(currentLocation.last);
   end;
 
   if possibleKeyword then
@@ -179,7 +194,7 @@ begin
   while peekChar in ['0'..'9'] do
     n := (n * BASE) + (ord(nextChar) - ord('0'));
 
-  t.integerValue := n;
+  integerLiteral := n;
   processNumber := IntegerToken;
 end;
 
@@ -192,10 +207,10 @@ end;
 
 function processStringLiteral: TTokenType;
 begin
-  t.literalString := '';
+  stringLiteral := '';
   nextChar; { consume opening " }
   while peekChar <> '"' do
-    t.literalString := t.literalString + nextChar;
+    stringLiteral := stringLiteral + nextChar;
 
   nextChar; { consume closing " }
   processStringLiteral := StringLiteralToken;
@@ -215,7 +230,11 @@ end;
 function nextToken: TTokenType;
 begin
   skipWhiteSpace;
-  t.location.from := currentLocation.last;
+  if peekChar = '!' then
+    while peekChar <> Char(10) do
+      NextChar;
+
+  currentLocation.from := currentLocation.last;
 
   case peekChar of
     'a'..'z', 'A'..'Z': nextToken := processIdentifier;
@@ -225,8 +244,7 @@ begin
     else                nextToken := resolveSymbol;
   end;
 
-  t.location.last := currentLocation.last -1;
-
+  currentLocation.last := currentLocation.last -1;
   if (nextToken = NoneToken) then
     with currentLocation do
     begin

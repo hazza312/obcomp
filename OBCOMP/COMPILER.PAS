@@ -21,12 +21,6 @@ begin
   halt(1);
 end;
 
-procedure Expect(tokenType: TTokenType; msg: string);
-begin
-  if peekToken <> tokenType then
-    error(msg)
-  else Next;
-end;
 
 function Accept(tokenType: TTokenType): boolean;
 begin
@@ -35,51 +29,61 @@ begin
 end;
 
 
+procedure Expect(tokenType: TTokenType; msg: string);
+begin
+  { adapt so we don't fail fast and try to do rest of file }
+
+  if peekToken <> tokenType then
+    error(msg);
+
+  Next;
+end;
+
+
+
 { Begin Recursive Descent parse Procedures ********************************** }
 procedure parseExpression; forward;                    { forward declarations }
 procedure parseDesignator; forward;
 procedure parseActualParameters; forward;
 procedure parseType; forward;
 
+{ RD Identifier Parsing ***************************************************** }
+
 procedure parseIdentifier;
 begin
-  expect(IdentifierToken, 'Identifier Expected');
+  { writeln(Lexer.t.identifierString); }
+  { expect(IdentifierToken, 'Identifier Expected'); }
 end;
 
 procedure parseQualident;
 begin
   repeat
+    expect(IdentifierToken, 'identifier expected');
     parseIdentifier;
   until not accept(DotToken);
 end;
 
 procedure parseIdentList;
 begin
-  repeat
-    expect(IdentifierToken, 'Identifier expected');
-    { do something with the identifier }
-
-  until not accept(ColonToken);
+  expect(IdentifierToken, 'Identifier expected');
+  while accept(CommaToken) do
+    expect(IdentifierToken, 'Identifier expected following comma in identlist');
 end;
 
 procedure parseFormalType;
 begin
   if accept(ArrayToken) then
-    begin
-      expect(OfToken, 'ARRAY without OF in formal parameter');
-      { do something to note open array }
-    end;
+    expect(OfToken, 'ARRAY without OF in formal parameter');
 
-    parseQualIdent;
+  parseQualIdent;
 end;
 
 procedure parseFPSection;
 begin
   if accept(VarToken) then
-  ; { note that it is var }
+    ;
 
   expect(IdentifierToken, 'Identifier expected');
-  { do something with the identifier }
   while accept(CommaToken) do
     expect(IdentifierToken, 'Identifier expected');
 
@@ -92,34 +96,28 @@ begin
   { left brack accepted }
   if not accept(RightBracketToken) then
     begin
-      { we must have at least one FPSection }
-      parseFPSection;
-      while accept(SemiColonToken) do
+      repeat
         parseFPSection;
+      until not accept(SemiColonToken);
 
       expect(RightBracketToken, ') expected');
   end;
 
   if accept(ColonToken) then
-    parseQualident;
+    parseQualident
 end;
 
 procedure ParseImport;
 begin
   expect(IdentifierToken, 'Identifier expected as import');
-  { do something with the identifier }
   if accept(AssignToken) then
-  begin
     expect(IdentifierToken, 'Identifier expected following import assign');
-    { do something with the identifier }
-  end;
 end;
 
 procedure ParseImportList;
 begin
   { IMPORT keyword has been accepted }
   expect(IdentifierToken, 'Identifier expected as import');
-  { do something with the identifier }
   while accept(CommaToken) do
     ParseImport;
 
@@ -137,22 +135,30 @@ procedure parseSet;
 begin
   { Leftcurly has been accepted }
   if not accept(RightCurlyToken) then
-    repeat
-      parseElement
-    until not accept(CommaToken);
+    begin
+      parseElement;
+      while accept(CommaToken) do
+        parseElement;
+
+      expect(RightCurlyToken, 'set terminator expected');
+    end;
 end;
+
+{ RD Expressions ************************************************************ }
 
 procedure parseFactor;
 begin
+  { writeln('parse factor'); }
   if accept(NilToken) then
   else if accept(FalseToken) then
   else if accept(IntegerToken) then
   else if accept(StringLiteralToken) then
-  else if accept(LeftCurlyToken) then
     begin
-      parseSet;
-      expect(RightCurlyToken, '} expected to close set');
+      parseIdentifier;  { hack for now }
+      expect(StringLiteralToken, 'closing " required');
     end
+  else if accept(LeftCurlyToken) then
+      parseSet
   else if accept(LeftBracketToken) then
     begin
       parseExpression;
@@ -172,18 +178,12 @@ begin
 end;
 
 procedure parseTerm;
+const
+  mulop = [StarToken, SlashToken, DivToken, ModToken, AndToken];
 begin
   parseFactor;
-  while true do
-    begin
-      if accept(StarToken) then
-      else if accept(SlashToken) then
-      else if accept(DivToken) then
-      else if accept(ModToken) then
-      else if accept(AndToken) then
-      else exit;
-      parseFactor ;
-  end;
+  while peekToken in mulop do
+    parseFactor
 end;
 
 procedure parseConstExpression;
@@ -192,35 +192,29 @@ begin
 end;
 
 procedure parseSimpleExpression;
+const
+  plusOps = [PlusToken, DashToken, OrToken];
+var
+  negate: boolean;
+  n: integer;
 begin
-  if accept(PlusToken) then
-  else if accept(DashToken) then
-  ;
-
+  { }
+  negate := accept(DashToken); accept(PlusToken);
   parseTerm;
-  while true do
-    begin
-      if accept(PlusToken) then
-      else if accept(DashToken) then
-      else if accept(OrToken) then
-      else break;
-
-    end;
+  while peekToken in plusOps do
+    { do something specific with the token }
+    parseTerm;
 end;
 
 procedure parseExpression;
+const
+  relop = [EqualsToken, HashToken, LTToken, LTEToken, GTToken, GTEToken, InToken, IsToken];
 begin
   parseSimpleExpression;
-  if       accept(EqualsToken) then
-  else if  accept(HashToken)  then
-  else if accept(LTToken) then
-  else if accept(LTEToken) then
-  else if accept(GTToken) then
-  else if accept(GTEToken) then
-  else if accept(InToken) then
-  else if accept(IsToken) then
-
+  if peekToken in relop then parseSimpleExpression;
 end;
+
+{ Declarations ************************************************************** }
 
 procedure parseConstDeclaration;
 begin
@@ -229,7 +223,7 @@ begin
   if accept(StarToken) then
     { do something with the public* };
 
-  expect(AssignToken, 'Expected an assignment operator in const declar');
+  expect(EqualsToken, 'Expected = in const declar');
   parseExpression;
   { do something with the (Const)expression }
 end;
@@ -258,6 +252,8 @@ begin
   while accept(SemicolonToken) do
     parseFieldList;
 end;
+
+{ RD Parse Types ************************************************************ }
 
 procedure parseRecordType;
 begin
@@ -314,17 +310,15 @@ begin
   if accept(StarToken) then
     ; { do something with the public* }
 
-  expect(AssignToken, 'Assign token expected in type declaration');
+  expect(EqualsToken, '= expected in type declaration');
   parseType;
 end;
 
 procedure parseVarDeclaration;
 begin
   ParseIdentList;
-  { do something with the identifier list }
   expect(ColonToken, 'Colon expected after identlist');
   parseType;
-  { do something with the type }
 end;
 
 procedure parseStatementSequence; forward;
@@ -333,8 +327,6 @@ procedure parseProcedureHeading;
 begin
   expect(ProcedureToken, 'PROCEDURE expected');
   expect(IdentifierToken, 'Identifier expected');
-  { do something with the identifier }
-
   if accept(LeftBracketToken) then
     parseFormalParameters;
 end;
@@ -343,7 +335,7 @@ end;
 procedure parseLabel;
 begin
   if accept(IntegerToken) then
-    { do something with the integer }
+
   else if accept(StringLiteralToken) then
     { do something with the string literal }
   else
@@ -366,6 +358,8 @@ begin
     parseLabelRange;
   until not accept(CommaToken);
 end;
+
+{ RD Statement Parsing ******************************************************* }
 
 
 procedure parseCase; { singular? }
@@ -456,22 +450,29 @@ begin
 end;
 
 procedure parseDesignator;
+const
+  selectorStarts = [DotToken, LeftSquareToken, CaretToken, LeftBracketToken];
+
 begin
   parseQualident;
-  if accept(DotToken) then
-    parseIdentifier
-  else if accept(LeftSquareToken) then
-    begin
-      parseExpressionList;
-      expect(RightSquareToken, 'Closing ] expected');
-    end
-  else if accept(CaretToken) then
+  while peekToken in selectorStarts do
+  begin
+    if accept(DotToken) then
+      parseIdentifier
+    else if accept(LeftSquareToken) then
+      begin
+        parseExpressionList;
+        expect(RightSquareToken, 'Closing ] expected');
+      end
+    else if accept(CaretToken) then
 
-  else if accept(LeftBracketToken) then
-    begin
-      parseDesignator;
-      expect(RightBracketToken, ') expected');
-    end;
+    { This is the problematc one -- typeguard to distinguish func call from selector? }
+    else if accept(LeftBracketToken) then
+     begin
+        parseQualident;
+        expect(RightBracketToken, ') expected');
+      end
+  end;
 end;
 
 procedure parseActualParameters;
@@ -486,7 +487,9 @@ procedure parseAssignmentOrCall;
 begin
   parseDesignator;
   if accept(AssignToken) then
-    parseExpression
+    begin
+      parseExpression
+    end
   else if accept(LeftBracketToken) then
     begin
       parseActualParameters;
@@ -542,39 +545,38 @@ begin
 end;
 
 procedure ParseDeclarationSequence;
+const
+  moveOn = [ConstToken, TypeToken, VarToken, BeginToken];
+
 begin
-  if accept(ConstToken) then
+  while peekToken in [ConstToken, TypeToken, VarToken] do
     begin
-      parseConstDeclaration;
-      expect(SemiColonToken, 'Semicolon expected to conclude const decl seq');
-    end
+      if accept(ConstToken) then
+        repeat parseConstDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
 
-  else if accept(TypeToken) then
-    begin
-      parseTypeDeclaration;
-      expect(SemiColonToken, 'Semicolon expected to conclude type decl seq');
-    end
+      else if accept(TypeToken) then
+        repeat parseTypeDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
 
-  else if accept(VarToken) then
-    begin
-      parseVarDeclaration;
-      expect(SemiColonToken, 'Semicolon expected to conclude bar decl seq');
-    end
-
+      else if accept(VarToken) then
+      repeat parseVarDeclaration; expect(SemiColonToken, '; sep expected') until peekToken in MoveOn
+    end;
 end;
 
 procedure ParseModule;
 begin
   expect(ModuleToken, 'MODULE expected to begin file');
   expect(IdentifierToken, 'Identifier expected after module');
-  { do something with the identifier }
   expect(SemicolonToken, 'Semicolon expected');
   if accept(ImportToken) then
     ParseImportList;
 
   ParseDeclarationSequence;
+  if accept(BeginToken) then
+    parseStatementSequence;
 
-  readln;
+  expect(EndToken, 'END expected closing module');
+  expect(IdentifierToken, 'Identifier expected closing module');
+  expect(DotToken, 'Dot required to close module');
 end;
 
 
