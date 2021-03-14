@@ -18,7 +18,7 @@ CONST
   b2 = t;
   b3 = {};
   b4 = {1};
-  b5 = {1,2,3};
+  b5 = {1,2};
   b6 = "hello";
   b7 = "hello there";
 
@@ -26,6 +26,7 @@ VAR
   f, y: integer;
   t: real;
   A: ARRAY 234, 345 OF integer;
+  C*, D*: integer;
   
 
 PROCEDURE ProcNoArgsNoReturn;
@@ -59,6 +60,8 @@ END Proc2argsametype;
 
 
 PROCEDURE Proc2argsametype(x, y: INTEGER; z: REAL; d: SOMETHINGELSE): INTEGER;
+VAR
+  x : integer;
 BEGIN
   null
 END Proc2argsametype;
