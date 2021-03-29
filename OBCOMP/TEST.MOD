@@ -2,16 +2,16 @@ MODULE hello;
 IMPORT Out;
 
 TYPE
-  a1 = integer;
-  a2 = real;
+  a1 = INTEGER;
+  a2 = REAL;
   a3 = RECORD 
     day, month, year: INTEGER;
     age: INTEGER
   END;
   
-  a4 = ARRAY 1 OF integer;
-  a5 = ARRAY x OF integer;
-  a6 = ARRAY 1, x, 5 OF integer;
+  a4 = ARRAY 1 OF INTEGER;
+  a5 = ARRAY x OF INTEGER;
+  a6 = ARRAY 1, x, 5 OF INTEGER;
 
 CONST
   b1 = 3;
@@ -23,10 +23,10 @@ CONST
   b7 = "hello there";
 
 VAR
-  f, y: integer;
-  t: real;
-  A: ARRAY 234, 345 OF integer;
-  C*, D*: integer;
+  f, y: INTEGER;
+  t: REAL;
+  A: ARRAY 234, 345 OF INTEGER;
+  C*, D*: INTEGER;
   
 
 PROCEDURE ProcNoArgsNoReturn;
@@ -61,7 +61,7 @@ END Proc2argsametype;
 
 PROCEDURE Proc2argsametype(x, y: INTEGER; z: REAL; d: SOMETHINGELSE): INTEGER;
 VAR
-  x : integer;
+  x : INTEGER;
 BEGIN
   null
 END Proc2argsametype;

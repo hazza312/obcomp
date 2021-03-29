@@ -2,18 +2,17 @@ unit SymbolTable;
 interface
 
 uses
-  Lexer;
+  Lexer, sysutils;
 
 const
   MAX_SYMBOLS = 100;
 
 type
   PSymbolEntry = ^TSymbolEntry;
-    
- 
 
   { which symbols can we store in our table? }
   TSymbolType = (
+    SPrimitiveType,
     SVariable,
     SArrayType,
     SSimpleType,
@@ -27,7 +26,7 @@ type
   TFormalParameterFlag = (FPFlagVar, FPFlagReturn);
 
   TSymbolEntry = record
-    id:     array[1..16] of char;       { ptr to the string identifier }
+    id:     string[16];       { ptr to the string identifier }
     scope:  integer; { ptr to enclosing scope }
     loc:    Location;      { of first declaration }
     addr:   integer;       { not used in case of type? }
@@ -42,6 +41,8 @@ type
       SFormalParameter:   (fpFlags:         set of TFormalParameterFlag);
 
   end;
+
+  
 
   { public procedures for mutating symbol table }
   function DeclareVariable(name: string): boolean;
@@ -69,10 +70,27 @@ var
   nos: 1..MAX_SYMBOLS;
   scope: integer;
 
-  { some private helpers }
+  function Find(name: string): PSymbolEntry;
+  var 
+    i: integer;
+  begin
+    Find := nil;
+    for i := 1 to nos do
+      begin
+      if CompareStr(table[i].id, name) = 0 then
+        begin
+          Find := @table[i];
+          exit
+        end
+      end
+  end;
 
+  { some private helpers }
   function Declare(name: string; stype: TSymbolType): boolean;
   begin
+    if Find(name) <> nil then 
+      exit;
+
     table[nos].id := name;
     table[nos].loc := currentLocation;
     table[nos].symType := stype;
@@ -95,27 +113,32 @@ var
 
 
   function EnterScope: boolean; begin Inc(scope) end;
-  function ExitScope: boolean; begin Dec(scope) end;
+  function ExitScope: boolean; 
+  begin 
+    Dec(scope)
+    {  clean up }
+   end;
 
   { procedures for looking up symbol table }
   function GetType(tyStr: string): PSymbolEntry; begin end;
   function GetVariable(varStr: string): PSymbolEntry; begin end;
   function GetProcedure(varProc: string): PSymbolEntry; begin end;
 
+
   procedure Dump;
   var i: integer;
   begin
-    writeln('L':3, ' ',  'type':12, 'sco':5, '@':20, 'name':20);
+    writeln('L':3, ' ',  'type':20, 'sco':5, '@':20, 'name':20);
     for i := 1 to nos-1 do
-      begin
-        with table[i] do
-          begin
-            writeln(loc.line:3, ' ',  table[i].symType:12, table[i].scope:5, addr:20, id:20);
-          end;
-      end
+      with table[i] do
+        writeln(loc.line:3, ' ',  table[i].symType:20, table[i].scope:5, addr:20, id:20);
   end;
 
 begin
   nos := 1;
   scope := 0;
+  Declare('INTEGER', SPrimitiveType);
+  Declare('REAL', SPrimitiveType);
+  Declare('CHAR', SPrimitiveType);
+  Declare('STRING', SPrimitiveType);
 end.

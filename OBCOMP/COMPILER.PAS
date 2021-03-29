@@ -1,6 +1,7 @@
 program Compiler;
 
-uses Lexer, Debug, SymbolTable;
+uses 
+  Lexer, SymbolTable;
 
 var
   peekToken: TTokenType;
@@ -151,6 +152,7 @@ begin
     end;
 end;
 
+
 procedure parseTerm;
 const
   mulop = [StarToken, SlashToken, DivToken, ModToken, AndToken];
@@ -194,7 +196,6 @@ begin
 end;
 
 { Declarations ************************************************************** }
-
 procedure parseConstDeclaration;
 begin
   expect(IdentifierToken);
@@ -362,6 +363,7 @@ begin
   expect(EndToken);
 end;
 
+
 procedure parseWhileStatement;
 begin
   { WHILE accepted }
@@ -378,6 +380,7 @@ begin
   expect(EndToken);
 end;
 
+
 procedure parseRepeatStatement;
 begin
   { REPEAT accepted }
@@ -385,6 +388,7 @@ begin
   expect(UntilToken);
   parseExpression;
 end;
+
 
 procedure parseForStatement;
 begin
@@ -456,54 +460,26 @@ begin
     end;
 end;
 
-procedure parseStatement;
-begin
-  if accept(IfToken) then
-    parseIfStatement
-  else if accept(CaseToken) then
-    parseCaseStatement
-  else if accept(WhileToken) then
-    parseWhileStatement
-  else if accept(RepeatToken) then
-    parseRepeatStatement
-  else if accept(ForToken) then
-    parseForStatement
-  else
-    parseAssignmentOrCall;
-end;
-
 procedure parseStatementSequence;
 begin
-  parseStatement;
-  while accept(SemicolonToken) do 
-    parseStatement;  
+  repeat 
+    if accept(IfToken) then
+      parseIfStatement
+    else if accept(CaseToken) then
+      parseCaseStatement
+    else if accept(WhileToken) then
+      parseWhileStatement
+    else if accept(RepeatToken) then
+      parseRepeatStatement
+    else if accept(ForToken) then
+      parseForStatement
+    else
+      parseAssignmentOrCall
 
+  until not accept(SemicolonToken);
 end;
 
-{ some forward references }
-procedure parseDeclarationSequence; forward;
-
-procedure parseProcedureBody;
-begin
-  SymbolTable.EnterScope;
-  parseDeclarationSequence;
-  if accept(BeginToken) then
-    parseStatementSequence;
-
-  if accept(ReturnToken) then
-    parseExpression;
-
-  expect(EndToken);
-  expect(IdentifierToken);
-  SymbolTable.ExitScope;
-end;
-
-procedure parseProcedureDeclaration;
-begin
-  parseProcedureHeading;
-  expect(SemicolonToken);
-  parseProcedureBody;
-end;
+procedure parseProcedureDeclaration; forward;
 
 procedure ParseDeclarationSequence;
 const
@@ -524,6 +500,30 @@ begin
       else if accept(ProcedureToken) then
       repeat parseProcedureDeclaration; expect(SemiColonToken) until peekToken in MoveOn
     end;
+end;
+
+
+procedure parseProcedureBody;
+begin
+  SymbolTable.EnterScope;
+  parseDeclarationSequence;
+  if accept(BeginToken) then
+    parseStatementSequence;
+
+  if accept(ReturnToken) then
+    parseExpression;
+
+  expect(EndToken);
+  expect(IdentifierToken);
+  SymbolTable.ExitScope;
+end;
+
+
+procedure parseProcedureDeclaration;
+begin
+  parseProcedureHeading;
+  expect(SemicolonToken);
+  parseProcedureBody;
 end;
 
 
@@ -551,8 +551,6 @@ begin
 end;
 
 
-var
-  i: integer;
 begin
   Next; { prime pump }
   ParseModule;
