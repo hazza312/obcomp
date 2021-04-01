@@ -2,7 +2,7 @@ unit SymbolTable;
 interface
 
 uses
-  Lexer, sysutils;
+  Lexer;
 
 const
   MAX_SYMBOLS = 100;
@@ -42,17 +42,19 @@ type
 
   end;
 
-  
+  TSymbolIndex = 1..MAX_SYMBOLS;
+
 
   { public procedures for mutating symbol table }
   function DeclareVariable(name: string): boolean;
   function DeclareProcedure(name: string): boolean;
   function DeclareType(name: string): boolean;
   function DeclareRecordType(name: string): boolean;
+  function LastEntry: PSymbolEntry;
 
 
-  function EnterScope: boolean;
-  function ExitScope: boolean;
+  procedure EnterScope;
+  procedure ExitScope;
 
   { procedures for looking up symbol table }
   function GetType(tyStr: string): PSymbolEntry;
@@ -66,8 +68,8 @@ type
 implementation
 
 var
-  table: array[1..MAX_SYMBOLS] of TSymbolEntry;
-  nos: 1..MAX_SYMBOLS;
+  table: array[TSymbolIndex] of TSymbolEntry;
+  nos, currScopeStart: TSymbolIndex;
   scope: integer;
 
   function Find(name: string): PSymbolEntry;
@@ -77,7 +79,7 @@ var
     Find := nil;
     for i := 1 to nos do
       begin
-      if CompareStr(table[i].id, name) = 0 then
+      if (table[i].id = name) then
         begin
           Find := @table[i];
           exit
@@ -85,9 +87,15 @@ var
       end
   end;
 
+  function LastEntry: PSymbolEntry; 
+  begin 
+    LastEntry := @table[nos - 1] 
+  end;
+
   { some private helpers }
   function Declare(name: string; stype: TSymbolType): boolean;
   begin
+    Declare := false;
     if Find(name) <> nil then 
       exit;
 
@@ -96,33 +104,40 @@ var
     table[nos].symType := stype;
     table[nos].scope := scope;
     Inc(nos);
+    Declare := True;
   end;
 
   function DeclareVariable(name: string): boolean;
-  begin Declare(name, SVariable) end;
+  begin DeclareVariable := Declare(name, SVariable) end;
 
   { public procedures for mutating symbol table }
   function DeclareType(name: string): boolean; 
-  begin Declare(name, SSimpleType) end;
+  begin DeclareType := Declare(name, SSimpleType) end;
 
   function DeclareProcedure(name: string): boolean; 
-  begin Declare(name, SProcedure) end;
+  begin DeclareProcedure := Declare(name, SProcedure) end;
 
   function DeclareRecordType(name: string): boolean; 
-  begin Declare(name, SRecordType) end;
+  begin DeclareRecordType := Declare(name, SRecordType) end;
 
 
-  function EnterScope: boolean; begin Inc(scope) end;
-  function ExitScope: boolean; 
+  procedure EnterScope; 
   begin 
-    Dec(scope)
-    {  clean up }
+    Inc(scope);
+    currScopeStart := nos;
+  end;
+
+
+  procedure ExitScope; 
+  begin 
+    nos := currScopeStart;
+    while (currScopeStart = table[currScopeStart].scope) do Dec(currScopeStart);
    end;
 
   { procedures for looking up symbol table }
-  function GetType(tyStr: string): PSymbolEntry; begin end;
-  function GetVariable(varStr: string): PSymbolEntry; begin end;
-  function GetProcedure(varProc: string): PSymbolEntry; begin end;
+  function GetType(tyStr: string): PSymbolEntry; begin GetType := nil end;
+  function GetVariable(varStr: string): PSymbolEntry; begin GetVariable := nil end;
+  function GetProcedure(varProc: string): PSymbolEntry; begin GetProcedure := nil end;
 
 
   procedure Dump;
@@ -137,6 +152,7 @@ var
 begin
   nos := 1;
   scope := 0;
+  currScopeStart := 1;
   Declare('INTEGER', SPrimitiveType);
   Declare('REAL', SPrimitiveType);
   Declare('CHAR', SPrimitiveType);

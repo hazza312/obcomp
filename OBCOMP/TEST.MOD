@@ -67,6 +67,28 @@ BEGIN
 END Proc2argsametype;
 
 
+PROCEDURE Nested;
+    PROCEDURE Nested2;
+    VAR
+        yy: INTEGER;
+    BEGIN
+        null
+    END Nested2;
+
+
+VAR
+  x: INTEGER;
+    
+
+BEGIN
+    null
+END Nested;
+
+
+
+
+
+
 PROCEDURE Public* (x, y, z:  INTEGER; z: REAL): INTEGER;
 BEGIN null END Public;
 

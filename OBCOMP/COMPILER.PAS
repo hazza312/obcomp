@@ -1,7 +1,7 @@
 program Compiler;
 
 uses 
-  Lexer, SymbolTable;
+  Lexer, SymbolTable, CGX86;
 
 var
   peekToken: TTokenType;
@@ -169,10 +169,9 @@ end;
 procedure parseSimpleExpression;
 const
   plusOps = [PlusToken, DashToken, OrToken];
-var
-  negate: boolean;
+
 begin
-  negate := accept(DashToken); accept(PlusToken);
+  {negate := accept(DashToken); accept(PlusToken);}
   parseTerm;
   while peekToken in plusOps do
     begin
@@ -506,6 +505,7 @@ end;
 procedure parseProcedureBody;
 begin
   SymbolTable.EnterScope;
+  BeginFunction;
   parseDeclarationSequence;
   if accept(BeginToken) then
     parseStatementSequence;
@@ -516,6 +516,7 @@ begin
   expect(EndToken);
   expect(IdentifierToken);
   SymbolTable.ExitScope;
+  EndFunction;
 end;
 
 
