@@ -6,6 +6,7 @@ uses
 var
   peekToken: TTokenType;
   couldHaveAccepted: set of TTokenType;
+  statements: boolean;
 
 
 { Internal Parser Functions ************************************************* }
@@ -130,6 +131,8 @@ begin
   if accept(NilToken) then
   else if accept(FalseToken) then
   else if accept(IntegerToken) then
+    begin if statements then CGX86.DoConstant(Lexer.integerLiteral) end
+        
   else if accept(StringLiteralToken) then
     
   else if accept(LeftCurlyToken) then
@@ -156,12 +159,20 @@ end;
 procedure parseTerm;
 const
   mulop = [StarToken, SlashToken, DivToken, ModToken, AndToken];
+var
+  lastOp: TTokenType;
 begin
   parseFactor;
   while peekToken in mulop do
     begin
-      Next;
-      parseFactor      
+      lastOp := peekToken;      
+      Next; { accept the mulop }
+      parseFactor;
+      { type check }
+      case lastOp of
+        StarToken:  CGX86.DoOperation(CGX86.Mul);
+        SlashToken: CGX86.DoOperation(CGX86.Divide);        
+      end;
     end;
 end;
 
@@ -169,15 +180,23 @@ end;
 procedure parseSimpleExpression;
 const
   plusOps = [PlusToken, DashToken, OrToken];
+var 
+  lastOp: TTokenType;
 
 begin
   {negate := accept(DashToken); accept(PlusToken);}
   parseTerm;
   while peekToken in plusOps do
     begin
-      Next;
-      { do something specific with the token }
+      lastOp := peekToken;
+      Next; { consume }
       parseTerm;
+      
+      { type check }
+      case lastOp of
+        PlusToken: CGX86.DoOperation(CGX86.Add);
+        DashToken: CGX86.DoOperation(CGX86.Sub);        
+      end;
     end;
 end;
 
@@ -446,11 +465,17 @@ begin
 end;
 
 procedure parseAssignmentOrCall;
+var 
+  store: PSymbolEntry;
 begin
   parseDesignator;
+  { TODO: make this work properly }
+  store := SymbolTable.LastEntry;
+  
   if accept(AssignToken) then
     begin
-      parseExpression
+      parseExpression;
+      CGX86.DoAssign(store)
     end
   else if accept(LeftBracketToken) then
     begin
@@ -461,6 +486,7 @@ end;
 
 procedure parseStatementSequence;
 begin
+  statements := true;
   repeat 
     if accept(IfToken) then
       parseIfStatement
@@ -476,6 +502,7 @@ begin
       parseAssignmentOrCall
 
   until not accept(SemicolonToken);
+  statements := false;
 end;
 
 procedure parseProcedureDeclaration; forward;
