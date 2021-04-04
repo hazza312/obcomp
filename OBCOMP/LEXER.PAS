@@ -68,16 +68,17 @@ const
 
 var
   currentLocation: Location;
-  identifier: string;
   integerLiteral: integer;
   realLiteral: real;
   stringLiteral: string;
+    identifier: string;
 
 implementation
 
 var
   currentPeekChar: char;
   hasNextFlag: Boolean;
+
 
 
 function nextChar: char;
@@ -152,7 +153,7 @@ var
   i : TTokenType;
 begin
   for i:= Low(KeywordToken) to High(KeywordToken) do
-    if KEYWORDS[i] = identifier then
+    if KEYWORDS[i] = identifier  then
     begin
       processKeyword := i;
       exit;
@@ -172,7 +173,7 @@ begin
   while peekChar in ['a'..'z', 'A'..'Z', '0'..'9'] do
   begin
     if peekChar in ['a'..'z'] then possibleKeyword := False;
-    identifier := identifier + nextChar;
+    identifier  := identifier  + nextChar;
     Inc(currentLocation.last);
   end;
 
@@ -258,6 +259,7 @@ function hasNext: Boolean;
 begin
    hasNext := hasNextFlag;
 end;
+
 
 
 begin

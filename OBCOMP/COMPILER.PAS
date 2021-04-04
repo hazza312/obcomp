@@ -7,12 +7,14 @@ var
   peekToken: TTokenType;
   couldHaveAccepted: set of TTokenType;
   statements: boolean;
+  identifier: string;
 
 
 { Internal Parser Functions ************************************************* }
 function Next: TTokenType;
 begin
   Next := peekToken;
+  identifier := Lexer.identifier;
   peekToken := Lexer.nextToken;
 end;
 
@@ -55,29 +57,27 @@ end;
 
 
 { Begin Recursive Descent parse Procedures ********************************** }
-procedure parseExpression; forward;                    { forward declarations }
-procedure parseDesignator; forward;
+procedure parseExpression; forward;                  { forward declarations }
+function parseDesignator: PSymbolEntry; forward;
 procedure parseActualParameters; forward;
-procedure parseType; forward;
+function parseType: PSymbolEntry; forward;
 
 { RD Identifier Parsing ***************************************************** }
-procedure parseQualident;
+function parseQualident: PSymbolEntry;
 begin
   repeat
     expect(IdentifierToken);
+    parseQualident := SymbolTable.Find(identifier);
   until not accept(DotToken);
 end;
 
 
 procedure parseIdentList;
 begin
+  repeat
   expect(IdentifierToken); 
   accept(StarToken);
-  while accept(CommaToken) do
-    begin
-      expect(IdentifierToken);
-      accept(StarToken);
-    end;
+  until not accept(CommaToken);
 end;
 
 
@@ -126,6 +126,7 @@ end;
 
 { RD Expressions ************************************************************ }
 procedure parseFactor;
+var desig: PSymbolEntry;
 begin
   { writeln('parse factor'); }
   if accept(NilToken) then
@@ -146,7 +147,9 @@ begin
     parseFactor
   else
     begin
-      parseDesignator;
+      desig := parseDesignator;
+
+      CGX86.VarUse(desig); { TODO if fun call }
       if accept(LeftBracketToken) then
         begin
           parseActualParameters;
@@ -205,6 +208,7 @@ procedure parseExpression;
 const
   relop = [EqualsToken, HashToken, LTToken, LTEToken, GTToken, GTEToken, InToken, IsToken];
 begin
+
   parseSimpleExpression;
   if peekToken in relop then 
   begin 
@@ -226,9 +230,9 @@ end;
 procedure parseArrayType;
 begin
   { ARRAY accepted }
-  parseExpression; { length }
-  while accept(CommaToken) do
-    parseExpression;
+  repeat 
+    parseExpression; { length }
+  until not accept(CommaToken);
 
   expect(OfToken);
   parseType;
@@ -263,19 +267,19 @@ begin
 end;
 
 
-procedure parseType;
+function parseType: PSymbolEntry;
 begin
   if accept(ArrayToken) then
      parseArrayType
   else if accept(RecordToken) then
     begin
-       SymbolTable.DeclareRecordType(Lexer.identifier);
+       SymbolTable.DeclareRecordType(identifier);
        parseRecordType
     end
   else if accept(PointerToken) then
      begin
          expect(ToToken);
-         parseType;
+         parseType := parseType;
 
      end
   else if accept(ProcedureToken) then
@@ -284,7 +288,7 @@ begin
            parseFormalParameters
      end
   else if accept(IdentifierToken) then
-    SymbolTable.DeclareType(Lexer.identifier)
+    SymbolTable.DeclareType(identifier)
 end;
 
 procedure parseTypeDeclaration;
@@ -299,11 +303,29 @@ end;
 
 
 procedure parseVarDeclaration;
+var 
+  start, last: TSymbolIndex;
+  varType, lvar: PSymbolEntry;
 begin
-  ParseIdentList;
-  SymbolTable.DeclareVariable(Lexer.identifier);
+  start := SymbolTable.CurrentSymbolIndex;
+
+  repeat
+    expect(IdentifierToken); 
+    accept(StarToken); { allowed in LVs?? }
+    SymbolTable.DeclareVariable(identifier);
+  until not accept(CommaToken);
+  
+  last := SymbolTable.CurrentSymbolIndex;
   expect(ColonToken);
-  parseType;
+  varType := parseType;
+  
+  for start := start to last do
+  begin
+    lvar := IToPSym(start); 
+    SymbolTable.AssignType(lvar, varType);
+    CGX86.AllocLocal(lvar);
+  end;
+
 end;
 
 procedure parseStatementSequence; forward;
@@ -312,7 +334,7 @@ procedure parseProcedureHeading;
 begin
   { expect(ProcedureToken, 'PROCEDURE expected'); accepted }
   expect(IdentifierToken);
-  SymbolTable.DeclareProcedure(Lexer.identifier);
+  SymbolTable.DeclareProcedure(identifier);
   accept(StarToken);
   if peekToken in [ColonToken, LeftBracketToken] then
     parseFormalParameters
@@ -423,28 +445,26 @@ begin
   expect(EndToken);
 end;
 
-procedure parseExpressionList;
-begin
-  repeat
-    parseExpression;
-  until not accept(CommaToken);
-end;
 
-procedure parseDesignator;
+
+function parseDesignator: PSymbolEntry;
 const
   selectorStarts = [DotToken, LeftSquareToken, CaretToken, LeftBracketToken];
 
 begin
-  parseQualident;
+  parseDesignator := parseQualident;
   while peekToken in selectorStarts do
   begin
     if accept(DotToken) then
-      
+      expect(IdentifierToken)
     else if accept(LeftSquareToken) then
       begin
-        parseExpressionList;
+          repeat
+            parseExpression; { check type }
+          until not accept(CommaToken);
         expect(RightSquareToken);
       end
+      
     else if accept(CaretToken) then
 
     { This is the problematc one -- typeguard to distinguish func call from selector? }
@@ -460,17 +480,18 @@ procedure parseActualParameters;
 begin
   { ( accepted }
   if not accept(RightBracketToken) then
-    parseExpressionList
-
+      repeat
+        parseExpression;
+      until not accept(CommaToken);
 end;
 
 procedure parseAssignmentOrCall;
 var 
   store: PSymbolEntry;
 begin
-  parseDesignator;
-  { TODO: make this work properly }
-  store := SymbolTable.LastEntry;
+  store := parseDesignator;
+  if store = nil then 
+    writeln('nl!');
   
   if accept(AssignToken) then
     begin
@@ -498,6 +519,11 @@ begin
       parseRepeatStatement
     else if accept(ForToken) then
       parseForStatement
+    else if accept(ReturnToken) then
+      begin
+        parseExpression;
+        break;        
+      end
     else
       parseAssignmentOrCall
 
@@ -532,13 +558,10 @@ end;
 procedure parseProcedureBody;
 begin
   SymbolTable.EnterScope;
-  BeginFunction;
+  CGX86.BeginFunction;
   parseDeclarationSequence;
   if accept(BeginToken) then
     parseStatementSequence;
-
-  if accept(ReturnToken) then
-    parseExpression;
 
   expect(EndToken);
   expect(IdentifierToken);
@@ -557,7 +580,10 @@ end;
 
 procedure ParseModule;
 begin
-  expect(ModuleToken);      expect(IdentifierToken);    expect(SemicolonToken);
+  expect(ModuleToken);      
+  expect(IdentifierToken);    
+  SymbolTable.DeclareModule(identifier);
+  expect(SemicolonToken);
   if accept(ImportToken) then
     begin
       expect(IdentifierToken);
@@ -573,8 +599,13 @@ begin
 
   ParseDeclarationSequence;
   if accept(BeginToken) then
+  begin
+    SymbolTable.DeclareProcedure('_start');
+    CGX86.BeginFunction;
     parseStatementSequence;
+    CGX86.EndFunction;
 
+  end;
   expect(EndToken); expect(IdentifierToken); expect(DotToken);
 end;
 
@@ -582,5 +613,4 @@ end;
 begin
   Next; { prime pump }
   ParseModule;
-  SymbolTable.Dump;
 end.
