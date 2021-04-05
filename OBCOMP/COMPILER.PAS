@@ -55,6 +55,16 @@ begin
 end;
 
 
+procedure TypeError(msg: string);
+begin
+    with currentLocation do
+    begin
+        write(line, ':', from, '-', last, ' Type error!');
+        writeln(msg);
+        halt(1);
+    end;
+end;
+
 
 { Begin Recursive Descent parse Procedures ********************************** }
 procedure parseExpression; forward;                  { forward declarations }
@@ -143,18 +153,26 @@ begin
       parseExpression;
       expect(RightBracketToken);
     end
-  else if accept(TildeToken) then
+  else if accept(TildeToken) then { not sure what this does }
     parseFactor
   else
     begin
       desig := parseDesignator;
 
-      CGX86.VarUse(desig); { TODO if fun call }
-      if accept(LeftBracketToken) then
-        begin
-          parseActualParameters;
-          expect(RightBracketToken);
-        end;
+      if desig^.symType = SVariable then
+          CGX86.VarUse(desig) { TODO if fun call }
+
+      else if desig^.symType = SProcedure then 
+        if accept(LeftBracketToken) then
+            begin { need to do something with the parameters }
+              parseActualParameters;
+              expect(RightBracketToken);
+            end
+        else { no parameters }
+            CGX86.DoCall(desig)            
+
+      else
+        TypeError('Variable or function type expected'); { proc? }
     end;
 end;
 
@@ -453,6 +471,9 @@ const
 
 begin
   parseDesignator := parseQualident;
+  if parseDesignator = nil then
+      TypeError('Unknown identifier! ');
+
   while peekToken in selectorStarts do
   begin
     if accept(DotToken) then
@@ -487,22 +508,25 @@ end;
 
 procedure parseAssignmentOrCall;
 var 
-  store: PSymbolEntry;
+  desig: PSymbolEntry;
 begin
-  store := parseDesignator;
-  if store = nil then 
+  desig := parseDesignator;
+  if desig = nil then 
     writeln('nl!');
   
   if accept(AssignToken) then
     begin
       parseExpression;
-      CGX86.DoAssign(store)
+      CGX86.DoAssign(desig)
     end
   else if accept(LeftBracketToken) then
     begin
       parseActualParameters;
       expect(RightBracketToken);
-    end;
+    end
+  else { call without params? }
+    CGX86.DoCall(desig)   
+    
 end;
 
 procedure parseStatementSequence;

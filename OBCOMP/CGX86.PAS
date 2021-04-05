@@ -14,6 +14,7 @@ procedure EndModule;
 procedure DoConstant(op: integer);
 procedure DoOperation(op: TBinOp);
 procedure DoAssign(assignTo: PSymbolEntry); {TODO}
+procedure DoCall(fn: PSymbolEntry);
 procedure VarUse(v: PSymbolEntry);
 procedure AllocLocal(lvar: PSymbolEntry);
 
@@ -99,6 +100,12 @@ begin
 end;
 
 
+procedure DoCall(fn: PSymbolEntry);
+begin
+    writeln(out, chr(9), 'call ', fn^.id)
+end;
+
+
 { entry in symbol table }
 procedure BeginFunction;
 begin
@@ -123,7 +130,7 @@ end;
 procedure EndFunction;
 begin
     writeln(out, chr(9), 'leave');
-    
+    writeln(out, chr(9), 'ret');
     stackSpace := 0;
 end;
 
