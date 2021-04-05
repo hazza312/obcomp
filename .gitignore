@@ -12,4 +12,8 @@ TP7/
 *.cfg
 *.dsk
 *.ini
+*.asm
+COMPILER
+fp.dir
+a.out
 
