@@ -10,6 +10,7 @@ type
 
 procedure BeginFunction;
 procedure EndFunction;
+procedure EndModule;
 procedure DoConstant(op: integer);
 procedure DoOperation(op: TBinOp);
 procedure DoAssign(assignTo: PSymbolEntry); {TODO}
@@ -101,15 +102,15 @@ end;
 { entry in symbol table }
 procedure BeginFunction;
 begin
-    stackSpace := 0;
     topRegister := R8;
-    writeln(out, 'global ', LastEntry^.id);
+    writeln(out, 'global ', LastEntry^.id); { TODO }
     writeln(out, LastEntry^.id, ':');
+    writeln(out, chr(9), 'enter ', -StackSpace, ', 0');
     { reserve some snack space }
 end;
 
 
-procedure EndFunction;
+procedure EndModule;
 begin
     writeln(out, chr(9), 'mov eax, 60');
     writeln(out, chr(9), 'xor edi, edi');
@@ -119,7 +120,16 @@ begin
 end;
 
 
+procedure EndFunction;
 begin
+    writeln(out, chr(9), 'leave');
+    
+    stackSpace := 0;
+end;
+
+
+begin
+    stackSpace := 0;
     Assign(out, ''); 
     rewrite(out);
     SymbolTable.DeclarePrimitive('INTEGER', 8);

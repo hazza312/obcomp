@@ -603,7 +603,7 @@ begin
     SymbolTable.DeclareProcedure('_start');
     CGX86.BeginFunction;
     parseStatementSequence;
-    CGX86.EndFunction;
+    CGX86.EndModule;
 
   end;
   expect(EndToken); expect(IdentifierToken); expect(DotToken);

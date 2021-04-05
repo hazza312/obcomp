@@ -1,5 +1,10 @@
 MODULE simplexp;
+VAR 
+  X: INTEGER;
+
+
 BEGIN
-  RETURN 1
+  X := (7 - 4);
+  RETURN (X+ 2) * 4
   
 END simplexp.
