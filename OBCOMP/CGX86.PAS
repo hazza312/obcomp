@@ -10,20 +10,24 @@ type
 
 procedure BeginFunction;
 procedure EndFunction;
+procedure EndModule;
 procedure DoConstant(op: integer);
 procedure DoOperation(op: TBinOp);
 procedure DoAssign(assignTo: PSymbolEntry); {TODO}
+procedure DoCall(fn: PSymbolEntry);
+procedure VarUse(v: PSymbolEntry);
+procedure AllocLocal(lvar: PSymbolEntry);
 
 
 implementation
     
 type
-    TRegister = (R0, R8, R9, R10, R11, R12, R13, R14, R15);
-    TRegisterAllocation = set of TRegister;
+    TRegister = (rax, r8, r9, r10, r11, r12, r13, r14, r15);
     
 var
     topRegister: TRegister;
     out: text;
+    stackSpace: integer;
 
 { register allocation }
 function getRegister: TRegister;
@@ -39,6 +43,12 @@ begin
 end;
     
     
+procedure AllocLocal(lvar: PSymbolEntry);
+begin
+  lvar^.addr := stackSpace;
+  Dec(stackSpace, 8);
+end;
+
 
 
 procedure DoConstant(op: integer);
@@ -55,34 +65,83 @@ begin
     case op of 
         Add:      writeln(out, chr(9), 'add ', topRegister, ', ', top);
         Sub:      writeln(out, chr(9), 'sub ', topRegister, ', ', top);
-        Mul:      writeln(out, chr(9), 'mul ', topRegister, ', ', top);
-        Divide:   writeln(out, chr(9), 'div ', topRegister, ', ', top);
+        Mul:      writeln(out, chr(9), 'imul ', topRegister, ', ', top);
+        Divide:   
+          begin
+            { TODO make this nicer }
+            { X86_64 with 64 bit divisor needs dividend in RDX o RAX }
+            { Quotient result in RAX } 
+
+            writeln(out, chr(9), 'mov rax, ', topRegister);
+            writeln(out, chr(9), 'idiv ', top);
+            writeln(out, chr(9), 'mov ', topRegister, ', ', topRegister);
+          end
     end;    
+end;
+
+
+procedure VarUse(v: PSymbolEntry);
+begin
+     if v^.addr < 0 { local } then
+       writeln(out, chr(9), 'mov qword ', GetRegister, ', [rbp', v^.addr, '] ; LV', v^.id)
+    else
+       writeln(out, chr(9), 'mov qword ', GetRegister, ', [', v^.addr, '] ; LV', v^.id)   
+ 
 end;
 
 
 procedure DoAssign(assignTo: PSymbolEntry);
 begin
-    writeln(out, chr(9), 'mov ', assignTo^.id, ', ', FreeRegister);
+    if assignTo^.addr < 0 { local } then
+       writeln(out, chr(9), 'mov qword [rbp', assignTo^.addr, '], ', FreeRegister, ' ; LV', assignTo^.id)
+    else
+       writeln(out, chr(9), 'mov qword [', assignTo^.addr, '], ', FreeRegister, ' ;', assignTo^.id);   
+    
+end;
+
+
+procedure DoCall(fn: PSymbolEntry);
+begin
+    writeln(out, chr(9), 'call ', fn^.id)
 end;
 
 
 { entry in symbol table }
 procedure BeginFunction;
 begin
-    topRegister := R0;
-    writeln(out, ';', LastEntry^.id);
+    topRegister := R8;
+    writeln(out, 'global ', LastEntry^.id); { TODO }
+    writeln(out, LastEntry^.id, ':');
+    writeln(out, chr(9), 'enter ', -StackSpace, ', 0');
     { reserve some snack space }
+end;
+
+
+procedure EndModule;
+begin
+    writeln(out, chr(9), 'mov eax, 60');
+    writeln(out, chr(9), 'xor edi, edi');
+    writeln(out, chr(9), 'mov rdi, ', FreeRegister);
+    writeln(out, chr(9), 'syscall');
+    Flush(out);
 end;
 
 
 procedure EndFunction;
 begin
-    writeln(out, chr(9), 'RET');
+    writeln(out, chr(9), 'leave');
+    writeln(out, chr(9), 'ret');
+    stackSpace := 0;
 end;
 
 
 begin
+    stackSpace := 0;
     Assign(out, ''); 
     rewrite(out);
+    SymbolTable.DeclarePrimitive('INTEGER', 8);
+    SymbolTable.DeclarePrimitive('REAL', 8);
+    SymbolTable.DeclarePrimitive('CHAR', 1);
+    SymbolTable.DeclarePrimitive('STRING', 256);
+    writeln(out, 'bits 64');
 end.

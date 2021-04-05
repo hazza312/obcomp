@@ -15,8 +15,10 @@ type
     SPrimitiveType,
     SVariable,
     SArrayType,
+    SArrayDimension,
     SSimpleType,
     SProcedure,
+    SModule,
     SFormalParameter,
     SConstant,
     SRecordType,
@@ -27,31 +29,37 @@ type
 
   TSymbolEntry = record
     id:     string[16];       { ptr to the string identifier }
-    scope:  integer; { ptr to enclosing scope }
-    loc:    Location;      { of first declaration }
+    scope:  integer;          { ptr to enclosing scope }
+    loc:    Location;         { of first declaration }
     addr:   integer;       { not used in case of type? }
     { procedure needs to know how much stack space? -> sum of declared formals }
 
     case symType: TSymbolType of
       SVariable:          (varType:        ^TSymbolEntry);
-      SArrayType:         (elementType:    ^TSymbolEntry;
-                           size:            integer);
+      SArrayType:         (elementType:    ^TSymbolEntry);
       SConstant:          (constVal:        integer); { TODO: what is a constant? }
       SRecordType:        (baseRecordType: ^TSymbolEntry);
       SFormalParameter:   (fpFlags:         set of TFormalParameterFlag);
-
+      SPrimitiveType:     (primitiveSize:   integer);
   end;
 
   TSymbolIndex = 1..MAX_SYMBOLS;
 
 
   { public procedures for mutating symbol table }
+  function DeclarePrimitive(name: string; size: integer): boolean;
+  function DeclareModule(name: string): boolean;
   function DeclareVariable(name: string): boolean;
   function DeclareProcedure(name: string): boolean;
   function DeclareType(name: string): boolean;
   function DeclareRecordType(name: string): boolean;
+  function CurrentSymbolIndex: TSymbolIndex;
   function LastEntry: PSymbolEntry;
+  function Find(name: string): PSymbolEntry;
 
+  procedure AssignType(v: PSymbolEntry; ty: PSymbolEntry);
+  function IToPSym(i: TSymbolIndex): PSymbolEntry;
+  
 
   procedure EnterScope;
   procedure ExitScope;
@@ -60,6 +68,10 @@ type
   function GetType(tyStr: string): PSymbolEntry;
   function GetVariable(varStr: string): PSymbolEntry;
   function GetProcedure(varProc: string): PSymbolEntry;
+  
+  { qualident lookups }
+  { procedure StartQualident;
+  function QualidentSelector(entry: PSymbolEntry); }
 
   procedure Dump;
 
@@ -71,6 +83,19 @@ var
   table: array[TSymbolIndex] of TSymbolEntry;
   nos, currScopeStart: TSymbolIndex;
   scope: integer;
+  
+  
+  procedure AssignType(v: PSymbolEntry; ty: PSymbolEntry);
+  begin
+     v^.varType := ty;
+  end;
+  
+  
+  function IToPSym(i: TSymbolIndex): PSymbolEntry;
+  begin
+    IToPSym := @table[i];
+  end;
+  
 
   function Find(name: string): PSymbolEntry;
   var 
@@ -93,9 +118,9 @@ var
   end;
 
   { some private helpers }
-  function Declare(name: string; stype: TSymbolType): boolean;
+  function Declare(name: string; stype: TSymbolType): PSymbolEntry;
   begin
-    Declare := false;
+    Declare := nil;
     if Find(name) <> nil then 
       exit;
 
@@ -104,22 +129,37 @@ var
     table[nos].symType := stype;
     table[nos].scope := scope;
     Inc(nos);
-    Declare := True;
+    Declare := @table[nos];
   end;
 
   function DeclareVariable(name: string): boolean;
-  begin DeclareVariable := Declare(name, SVariable) end;
+  begin DeclareVariable := Declare(name, SVariable) <> nil end;
 
   { public procedures for mutating symbol table }
   function DeclareType(name: string): boolean; 
-  begin DeclareType := Declare(name, SSimpleType) end;
+  begin DeclareType := Declare(name, SSimpleType) <> nil end;
 
   function DeclareProcedure(name: string): boolean; 
-  begin DeclareProcedure := Declare(name, SProcedure) end;
+  begin DeclareProcedure := Declare(name, SProcedure) <> nil end;
 
   function DeclareRecordType(name: string): boolean; 
-  begin DeclareRecordType := Declare(name, SRecordType) end;
+  begin DeclareRecordType := Declare(name, SRecordType) <> nil end;
 
+  function DeclareModule(name: string): boolean; 
+  begin DeclareModule := Declare(name, SModule) <> nil end;
+
+  function DeclarePrimitive(name: string; size: integer): boolean; 
+  begin 
+    Declare(name, SPrimitiveType)^.primitiveSize := size;
+    DeclarePrimitive := true;
+  end;
+  
+
+
+  function CurrentSymbolIndex: TSymbolIndex;
+  begin
+    CurrentSymbolIndex := nos-1;
+  end;
 
   procedure EnterScope; 
   begin 
@@ -153,8 +193,4 @@ begin
   nos := 1;
   scope := 0;
   currScopeStart := 1;
-  Declare('INTEGER', SPrimitiveType);
-  Declare('REAL', SPrimitiveType);
-  Declare('CHAR', SPrimitiveType);
-  Declare('STRING', SPrimitiveType);
 end.
