@@ -1,6 +1,15 @@
 MODULE hello;
 IMPORT Out;
 
+CONST
+  b1 = 3;
+  b3 = {};
+  b4 = {1};
+  b5 = {1,2};
+  b6 = "hello";
+  b7 = "hello there";
+
+
 TYPE
   a1 = INTEGER;
   a2 = REAL;
@@ -8,19 +17,9 @@ TYPE
     day, month, year: INTEGER;
     age: INTEGER
   END;
-  
-  a4 = ARRAY 1 OF INTEGER;
-  a5 = ARRAY x OF INTEGER;
-  a6 = ARRAY 1, x, 5 OF INTEGER;
 
-CONST
-  b1 = 3;
-  b2 = t;
-  b3 = {};
-  b4 = {1};
-  b5 = {1,2};
-  b6 = "hello";
-  b7 = "hello there";
+
+
 
 VAR
   f, y: INTEGER;
@@ -31,49 +30,44 @@ VAR
 
 PROCEDURE ProcNoArgsNoReturn;
 BEGIN
-  null
+  f
 END ProcNoArgsNoReturn;
   
 
-PROCEDURE ProcNoArgsReturn: INTEGER;
+PROCEDURE ProcNoArgsReturna: INTEGER;
 BEGIN
-  null
-END ProcNoArgsReturn;
+  f
+END ProcNoArgsReturna;
 
 
 PROCEDURE ProcNoArgsBracketsReturn(): INTEGER;
 BEGIN
-  null
+  ProcNoArgsBracketsReturn
 END ProcNoArgsBracketsReturn;
 
 
 PROCEDURE Proc1arg(x:  INTEGER): INTEGER;
 BEGIN
-  null
+  Proc1arg
 END Proc1arg;
 
 
-PROCEDURE Proc2argsametype(x, y:  INTEGER): INTEGER;
-BEGIN
-  null
-END Proc2argsametype;
 
-
-PROCEDURE Proc2argsametype(x, y: INTEGER; z: REAL; d: SOMETHINGELSE): INTEGER;
+PROCEDURE Procargsametype(x, y: INTEGER; z: REAL; d: SOMETHINGELSE): INTEGER;
 VAR
   x : INTEGER;
 BEGIN
-  null
-END Proc2argsametype;
+  Procargsametype
+END Procargsametype;
 
 
 PROCEDURE Nested;
-    PROCEDURE Nested2;
+    PROCEDURE Nesteda;
     VAR
         yy: INTEGER;
     BEGIN
-        null
-    END Nested2;
+        Nested
+    END Nesteda;
 
 
 VAR
@@ -81,7 +75,7 @@ VAR
     
 
 BEGIN
-    null
+    Procargsametype
 END Nested;
 
 
@@ -90,11 +84,11 @@ END Nested;
 
 
 PROCEDURE Public* (x, y, z:  INTEGER; z: REAL): INTEGER;
-BEGIN null END Public;
+BEGIN f END Public;
 
 
 
 BEGIN
-  x := ((x[0][1][2][3] + 1) * (3-2)) DIV 4
+  f := ((A[0][1][2][3] + 1) * (3-2)) DIV 4
   
 END hello.

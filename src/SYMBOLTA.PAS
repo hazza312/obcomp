@@ -28,7 +28,7 @@ type
   TFormalParameterFlag = (FPFlagVar, FPFlagReturn);
 
   TSymbolEntry = record
-    id:     string[16];       { ptr to the string identifier }
+    id:     string[32];       { ptr to the string identifier }
     scope:  integer;          { ptr to enclosing scope }
     loc:    Location;         { of first declaration }
     addr:   integer;       { not used in case of type? }
