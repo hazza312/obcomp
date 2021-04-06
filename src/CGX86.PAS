@@ -142,7 +142,7 @@ end;
 { entry in symbol table }
 procedure BeginFunction(fn: PSymbolEntry);
 begin
-    topRegister := rnul;
+    topRegister := r10;
     writeln(out, 'global ', fn^.id); { TODO }
     writeln(out, fn^.id, ':');
     writeln(out, chr(9), 'enter ', -StackSpace, ', 0');
