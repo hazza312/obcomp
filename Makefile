@@ -12,6 +12,7 @@ test:	test_parse test_build
 
 test_parse:	build
 	# just see if the files can be parsed correctly
+	./build/COMPILER < test/comments.mod
 	./build/COMPILER < test/TEST.MOD 
 	./build/COMPILER < test/SIMPLEEXP.MOD > /dev/null
 	./build/COMPILER < test/SELECTORS.MOD > /dev/null

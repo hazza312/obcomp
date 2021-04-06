@@ -2,7 +2,7 @@ unit SymbolTable;
 interface
 
 uses
-  Lexer;
+  Common, Lexer;
 
 const
   MAX_SYMBOLS = 100;
