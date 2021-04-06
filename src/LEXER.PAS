@@ -59,14 +59,14 @@ type
 
 
 var
-    currentLocation: Location;
+    CurrentLocation: Location;
 
     { lex results for different types stored here }
     { TODO: make these private/function wrappers for these }
-    integerLiteral: integer;
-    realLiteral: real;
-    stringLiteral: string;
-    identifier: string;
+    IntegerLiteral: integer;
+    RealLiteral: real;
+    StringLiteral: string;
+    Identifier: string;
 
 
 
@@ -251,7 +251,7 @@ end;
     @private
     @pre        StartCommentToken was last token
     @post       consumes multiple characters 
-    @error      when unmatched
+    @error      when unmatched comments
 }
 procedure processComment;
 var
@@ -278,8 +278,11 @@ end;
 
 
 
-
-function nextToken: TTokenType;
+{ Get the next token type from the input stream.
+    @post       consumes multiple characters 
+    @error      on any lex error
+}
+function NextToken: TTokenType;
 var
     commentDepth: integer;
     p1: char;
