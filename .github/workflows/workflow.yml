@@ -26,12 +26,16 @@ jobs:
     needs: setup
     steps:
       - name: Build the compiler
-        run: make build
+        run: |  
+          cd obcomp
+          make build
   
   test:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Run some tests
-        run: make test
+        run: |  
+          cd obcomp
+          make test
 
