@@ -22,7 +22,7 @@ jobs:
         run: sudo apt-get install fpc gcc nasm python3
         
       - name: CD
-        run: cd obcomp
+        run: cd /home/runner/work/obcomp/obcomp
 
       - name: Build the compiler
         run: make build
