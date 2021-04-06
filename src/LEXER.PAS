@@ -168,12 +168,12 @@ end;
 { Having lexed an identifier, check if it is a keyword. Else, it's an identifier.
     @private
     @pre        identifier contains potential keyword }
-function processKeyword: TTokenType;
+function processKeyword(s: string): TTokenType;
 var
     i : TTokenType;
 begin
     for i:= Low(KeywordToken) to High(KeywordToken) do
-        if KEYWORDS[i] = identifier then
+        if KEYWORDS[i] = s then
             begin
                 processKeyword := i;
                 exit;
@@ -192,20 +192,23 @@ end;
 function processIdentifier: TTokenType;
 var
     possibleKeyword: boolean;
+    tmp: string;
 begin
+    processIdentifier := IdentifierToken;
     possibleKeyword := True;
-    identifier := '';
+    tmp := '';
 
     while peekChar in ['a'..'z', 'A'..'Z', '0'..'9'] do
         begin
             if peekChar in ['a'..'z'] then possibleKeyword := False; {keywords all upper}
-            identifier  := identifier  + nextChar;
+            tmp := tmp + nextChar;
         end;
 
     if possibleKeyword then
-        processIdentifier := processKeyword
-    else
-        processIdentifier := IdentifierToken;
+        processIdentifier := processKeyword(tmp);
+
+    if processIdentifier = IdentifierToken then
+        identifier := tmp;       
 end;
 
 
@@ -283,10 +286,6 @@ end;
     @error      on any lex error
 }
 function NextToken: TTokenType;
-var
-    commentDepth: integer;
-    p1: char;
-
 begin
     { skip whitespace }
     while peekChar in [' ', char(13), char(10)] do nextChar;

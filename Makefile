@@ -1,6 +1,6 @@
 build:	clean
 	mkdir build
-	fpc -FEbuild/ src/COMPILER.PAS
+	fpc -g -FEbuild/ src/COMPILER.PAS
 
 clean:
 	rm -rf build

@@ -1,33 +1,16 @@
 MODULE simplexp;
 VAR 
-  X: INTEGER;
+    Y: INTEGER;
 
 
-PROCEDURE hello;
-VAR X: INTEGER;
+PROCEDURE double(X: INTEGER): INTEGER;
 BEGIN
-  X := 3
+    RETURN X + X
 END hello;
 
 
-PROCEDURE hello2;
-VAR X: INTEGER;
 BEGIN
-  X := 3
-END hello2;
-
-PROCEDURE hello3;
-VAR X: INTEGER;
-BEGIN
-  X := 3
-END hello2;
-
-
-BEGIN
-  hello;
-  hello2;
-  hello3;
-  X := (7 - 4);
-  RETURN (X+ 2) * 4
+    Y := 10;
+    RETURN double(Y + 3)
   
 END simplexp.

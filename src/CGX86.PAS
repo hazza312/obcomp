@@ -1,28 +1,40 @@
 unit CGX86;
 interface
 uses
-  SymbolTable;
+    SymbolTable;
 
 
 type
-  TBinOp = (Add, Sub, Mul, Divide);
+    TBinOp = (Add, Sub, Mul, Divide);
 
 
-procedure BeginFunction;
-procedure EndFunction;
-procedure EndModule;
-procedure DoConstant(op: integer);
-procedure DoOperation(op: TBinOp);
-procedure DoAssign(assignTo: PSymbolEntry); {TODO}
-procedure DoCall(fn: PSymbolEntry);
-procedure VarUse(v: PSymbolEntry);
-procedure AllocLocal(lvar: PSymbolEntry);
+    procedure BeginFunction(fn: PSymbolEntry);
+    procedure EndFunction;
+    procedure EndModule;
+    procedure DoConstant(op: integer);
+    procedure DoOperation(op: TBinOp);
+    procedure DoAssign(assignTo: PSymbolEntry); {TODO}
+
+    procedure DoCall(fn: PSymbolEntry);
+    procedure PushArg;
+
+    procedure VarUse(v: PSymbolEntry);
+    procedure AllocLocal(lvar: PSymbolEntry);
 
 
 implementation
     
 type
-    TRegister = (rax, r8, r9, r10, r11, r12, r13, r14, r15);
+    TRegister = (
+        { parameter registers }
+        rdi, rsi, rdx, rcx, r8, r9,
+
+        { scratch registers }
+        rnul, r10, r11, r12, r13, r14, r15
+    );
+
+    TParameterRegister = rdi..r9;
+    TScratchRegister = r10..r15;
     
 var
     topRegister: TRegister;
@@ -45,8 +57,8 @@ end;
     
 procedure AllocLocal(lvar: PSymbolEntry);
 begin
-  lvar^.addr := stackSpace;
-  Dec(stackSpace, 8);
+    lvar^.addr := stackSpace;
+    Dec(stackSpace, 8);
 end;
 
 
@@ -82,10 +94,14 @@ end;
 
 procedure VarUse(v: PSymbolEntry);
 begin
-     if v^.addr < 0 { local } then
-       writeln(out, chr(9), 'mov qword ', GetRegister, ', [rbp', v^.addr, '] ; LV', v^.id)
-    else
-       writeln(out, chr(9), 'mov qword ', GetRegister, ', [', v^.addr, '] ; LV', v^.id)   
+    if v^.symType = SVariable then 
+        if v^.addr < 0 { local } then
+            writeln(out, chr(9), 'mov qword ', GetRegister, ', [rbp', v^.addr, '] ; LV', v^.id)
+        else
+            writeln(out, chr(9), 'mov qword ', GetRegister, ', [', v^.addr, '] ; LV', v^.id)  
+
+    else if v^.symType = SFormalParameter then
+        writeln(out, chr(9), 'mov ', GetRegister, ', rdi')
  
 end;
 
@@ -101,17 +117,34 @@ end;
 
 
 procedure DoCall(fn: PSymbolEntry);
+var
+    curr: TRegister;
+
 begin
-    writeln(out, chr(9), 'call ', fn^.id)
+    { TODO preserve registers }
+
+    { TODO multiple params passed }
+    writeln(out, chr(9), 'mov rdi, ', FreeRegister);
+
+    writeln(out, chr(9), 'call ', fn^.id);
+    { TODO restore  registers }
+
+    { TODO return type(s) }
+    writeln(out, chr(9), 'mov ', GetRegister, ', rax')
+end;
+
+procedure PushArg;
+begin
+    {writeln(out, chr(9), 'push ', FreeRegister);}
 end;
 
 
 { entry in symbol table }
-procedure BeginFunction;
+procedure BeginFunction(fn: PSymbolEntry);
 begin
-    topRegister := R8;
-    writeln(out, 'global ', LastEntry^.id); { TODO }
-    writeln(out, LastEntry^.id, ':');
+    topRegister := rnul;
+    writeln(out, 'global ', fn^.id); { TODO }
+    writeln(out, fn^.id, ':');
     writeln(out, chr(9), 'enter ', -StackSpace, ', 0');
     { reserve some snack space }
 end;
@@ -129,6 +162,7 @@ end;
 
 procedure EndFunction;
 begin
+    writeln(out, chr(9), 'mov rax, ', topRegister);
     writeln(out, chr(9), 'leave');
     writeln(out, chr(9), 'ret');
     stackSpace := 0;
