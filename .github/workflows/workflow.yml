@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Setup build environment
-        run: apt-get install fpc gcc nasm python3
+        run: sudo apt-get install fpc gcc nasm python3
     
   build:
     runs-on: ubuntu-latest
