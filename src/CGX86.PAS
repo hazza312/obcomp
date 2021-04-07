@@ -18,6 +18,9 @@ type
     procedure DoCall(fn: PSymbolEntry);
     procedure PushArg;
 
+    procedure EnterFor(loopvar: PSymbolEntry; loopid: integer);
+    procedure ExitFor(loopvar: PSymbolEntry; loopid: integer);
+
     procedure VarUse(v: PSymbolEntry);
     procedure AllocLocal(lvar: PSymbolEntry);
 
@@ -41,6 +44,7 @@ var
     out: text;
     stackSpace: integer;
 
+
 { register allocation }
 function getRegister: TRegister;
 begin
@@ -48,17 +52,34 @@ begin
     getRegister := topRegister;
 end;
 
+
 function freeRegister: TRegister;
 begin
     freeRegister := topRegister;
     Dec(topRegister);
 end;
-    
+
     
 procedure AllocLocal(lvar: PSymbolEntry);
 begin
     lvar^.addr := stackSpace;
     Dec(stackSpace, 8);
+end;
+
+{ get the assembly representation of some storage location by a symbol }
+function GetRef(sym: PSymbolEntry): string;
+var straddr: string;
+begin
+    Str(sym^.addr, straddr);
+    if sym^.symType = SVariable then 
+        if sym^.addr < 0 { local } then
+            GetRef := '[rbp' + straddr + ']'
+        else
+            GetRef := '[' + straddr + ']'  
+
+    else if sym^.symType = SFormalParameter then
+        GetRef := 'rdi'; { TODO }
+
 end;
 
 
@@ -94,25 +115,13 @@ end;
 
 procedure VarUse(v: PSymbolEntry);
 begin
-    if v^.symType = SVariable then 
-        if v^.addr < 0 { local } then
-            writeln(out, chr(9), 'mov qword ', GetRegister, ', [rbp', v^.addr, '] ; LV', v^.id)
-        else
-            writeln(out, chr(9), 'mov qword ', GetRegister, ', [', v^.addr, '] ; LV', v^.id)  
-
-    else if v^.symType = SFormalParameter then
-        writeln(out, chr(9), 'mov ', GetRegister, ', rdi')
- 
+    writeln(out, chr(9), 'mov qword ', GetRegister, ', ', GetRef(v), ';LV', v^.id); 
 end;
 
 
 procedure DoAssign(assignTo: PSymbolEntry);
 begin
-    if assignTo^.addr < 0 { local } then
-       writeln(out, chr(9), 'mov qword [rbp', assignTo^.addr, '], ', FreeRegister, ' ; LV', assignTo^.id)
-    else
-       writeln(out, chr(9), 'mov qword [', assignTo^.addr, '], ', FreeRegister, ' ;', assignTo^.id);   
-    
+    writeln(out, chr(9), 'mov qword ', GetRef(assignTo), ', ', FreeRegister, ' ; LV', assignTo^.id) 
 end;
 
 
@@ -121,13 +130,16 @@ var
     curr: TRegister;
 
 begin
-    { TODO preserve registers }
-
     { TODO multiple params passed }
     writeln(out, chr(9), 'mov rdi, ', FreeRegister);
 
+    for curr := r10 to topRegister do
+        writeln(out, chr(9), 'push ', curr);
+
     writeln(out, chr(9), 'call ', fn^.id);
-    { TODO restore  registers }
+
+    for curr := topRegister downto r10 do
+        writeln(out, chr(9), 'pop ', curr);
 
     { TODO return type(s) }
     writeln(out, chr(9), 'mov ', GetRegister, ', rax')
@@ -142,7 +154,7 @@ end;
 { entry in symbol table }
 procedure BeginFunction(fn: PSymbolEntry);
 begin
-    topRegister := r10;
+    topRegister := rnul;
     writeln(out, 'global ', fn^.id); { TODO }
     writeln(out, fn^.id, ':');
     writeln(out, chr(9), 'enter ', -StackSpace, ', 0');
@@ -158,6 +170,39 @@ begin
     writeln(out, chr(9), 'syscall');
     Flush(out);
 end;
+
+
+procedure EnterFor(loopvar: PSymbolEntry; loopid: integer);
+begin
+    { move end point somewhere TODO this wont work nested }
+    writeln(out, chr(9), 'mov rbx, ', FreeRegister);
+    DoAssign(loopvar);
+
+    { jumplabel }
+    writeln(out, '.forloopcheck_', loopid, ':');
+
+    { compare loopvar with end point: greater than? }
+    { jump if so to end }
+    writeln(out, chr(9), 'cmp ', GetRef(loopvar), ', rbx');
+    writeln(out, chr(9), 'jg ', '.forloopafter_', loopid);
+end;
+
+
+
+procedure ExitFor(loopvar: PSymbolEntry; loopid: integer);
+begin
+    { increment/decrement loop var }
+    writeln(out, chr(9), 'inc qword ', GetRef(loopvar));
+
+    { unconditional jmp back to loop check }
+    writeln(out, chr(9), 'jmp ', '.forloopcheck_', loopid);
+
+    { label for after }
+    writeln(out, '.forloopafter_', loopid, ':');
+end;
+
+
+
 
 
 procedure EndFunction;

@@ -18,6 +18,7 @@ def CALRT(path):
     ret = run(['nasm', '-f', 'elf64', 'tmp.asm', '-o', 'tmp.o'], encoding="utf-8", capture_output=True)
     if ret.returncode != 0:
         print(f"{path} test FAILED (assemble error) " + ret.stdout + ret.stderr)
+        print(open("tmp.asm").read())
         return
 
     ret = run(['ld', 'tmp.o', '-o', 'tmp'], encoding="utf-8", capture_output=True)
@@ -33,6 +34,7 @@ def CALRT(path):
             if ret.returncode != int(parts[1]):
                 # then test the output
                 print(f"{path} test FAILED (wrong result), got {ret.returncode} wanted {int(parts[1])}")
+                print(open("tmp.asm").read())
                 return
             else:
                 print(f"{path} test OK (correct result), got {ret.returncode}")

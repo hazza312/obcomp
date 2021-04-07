@@ -1,5 +1,5 @@
 build:	src/*.PAS
-	mkdir build
+	mkdir -p build
 	fpc -g -FEbuild/ src/COMPILER.PAS
 
 

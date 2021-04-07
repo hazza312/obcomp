@@ -6,7 +6,7 @@ uses
 var
     peekToken: TTokenType;
     statements: boolean;
-
+    nloops: integer;
 
 
 { Internal Parser Functions ************************************************* }
@@ -70,13 +70,13 @@ procedure parseFormalParameters;
     var 
         start, last: TSymbolIndex;
         ty: PSymbolEntry;
+        isvar: boolean;
     begin
-        accept(VarToken);   
+        isvar := accept(VarToken);   
         start := SymbolTable.CurrentSymbolIndex;
         repeat
             expect(IdentifierToken);
-            writeln(identifier);
-            SymbolTable.DeclareFormalParameter(identifier, false);
+            SymbolTable.DeclareFormalParameter(identifier, isvar);
         until not accept(CommaToken);
 
         expect(ColonToken);
@@ -451,17 +451,30 @@ end;
 
 
 procedure parseForStatement;
+var 
+    loopVar: PSymbolEntry;
 begin
     { FOR token accepted }
+    expect(IdentifierToken);
+    loopVar := Find(identifier);    
+
     expect(AssignToken);
     parseExpression;
     expect(ToToken);
+    parseExpression;
 
+    Inc(nloops);
+    CGX86.EnterFor(loopVar, nloops);
+    { TODO }
     if accept(ByToken) then
         parseExpression;
 
     expect(DoToken);
     parseStatementSequence;
+
+    CGX86.ExitFor(loopVar, nloops);
+    Dec(nloops);
+
     expect(EndToken);
 end;
 
@@ -645,6 +658,7 @@ end;
 
 
 begin
+    nloops := 0;
     Next; { prime pump }
     ParseModule;
     
